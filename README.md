@@ -7,7 +7,7 @@
  - 目前仅支持mysql和sqlite
 ### 使用方式
 
- - 1 需要在init函数中写入如下语句进行初始化mapper
+ - 1 需要在init函数中写入如下语句进行初始化mapper , 然后将该项目下的文件夹复制到其项目下即可,需要注意引用包的路径更改
    ```go
     mapper.InitMapper(mapper.Sqlite, true)
    ```
