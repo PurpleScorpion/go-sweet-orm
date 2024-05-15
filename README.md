@@ -38,11 +38,11 @@
     Delete(QueryWrapper) 返回值为int64 (删除影响的行数)
         根据QueryWrapper条件来删除数据
     Insert(entity,excludeField...) 返回值为int64 (新增影响的行数)
-        根据传入实体类中的值进行新增
+        根据传入实体类中的值进行新增 , 新增后该对象中会有新增后的id
         默认自增主键 , 空值排除(若为0或""等空值,则默认不向数据库中添加该值)
         excludeField为可变参数列表,传入的值为新增时忽视的字段
     InsertCustom(entity,autoId,excludeEmpty,excludeField...) 返回值为int64 (新增影响的行数)
-        根据传入实体类中的值进行新增
+        根据传入实体类中的值进行新增 若autoId为true 则新增后该对象中会有新增后的id
         autoId: 是否为自增主键 true:自增主键/false:自定义主键
         excludeEmpty: 是否进行空值排除 true:空值排除/false:空值仍然存储
         excludeField为可变参数列表,传入的值为新增时忽视的字段
