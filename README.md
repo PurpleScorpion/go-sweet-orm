@@ -84,11 +84,11 @@
        - 参数列表: 与Eq一致 注意,查询器会自动添加%, 例如: `%张三%`
      - IsNull(flag,column) `释义: 空值判断`
        - 参数列表: 与Eq一致,但是没有value参数
-     - IsNotNull(flag,column,value...) `释义: 非空判断`
+     - IsNotNull(flag,column) `释义: 非空判断`
        - 参数列表: 与Eq一致,但是没有value参数
-     - In(flag,column,value) `释义: mysql中in函数`
+     - In(flag,column,value...) `释义: mysql中in函数`
        - 参数列表: 与Eq一致,但是该value为可变参数,且要求参数类型必须全部一致
-     - NotIn(flag,column,value) `释义: mysql中 not in 函数`
+     - NotIn(flag,column,value...) `释义: mysql中 not in 函数`
        - 参数列表: 与Eq一致,但是该value为可变参数,且要求参数类型必须全部一致
      - Between(flag,column,from,to) `释义: mysql中 between and 函数`
        - 参数列表: 前两个参数与Eq一致
