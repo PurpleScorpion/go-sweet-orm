@@ -302,3 +302,54 @@ func SelectList4SQL(resList interface{}, sql string, values ...interface{}) {
 	r := o.Raw(sql, values...)
 	r.QueryRows(resList)
 }
+
+/*
+原生sql插入数据方式
+
+	sql: 原生sql
+	autoId: 是否是自增主键 true: 自增主键,返回值将返回插入后的自增主键值 / false: 不是自增主键,返回值中的自增主键值为0
+	values... : 可变参数, 用于替换 `?` 占位符
+
+return:
+
+	返回值1: 影响的行数
+	返回值2: 插入后的自增主键值 , 受autoId参数影响
+*/
+func Insert4SQL(autoId bool, sql string, values ...interface{}) (int64, int64) {
+	o := orm.NewOrm()
+	res, err := o.Raw(sql, values...).Exec()
+	checkErr(err)
+	count, err := res.RowsAffected()
+	checkErr(err)
+	if autoId {
+		lastId, err := res.LastInsertId()
+		checkErr(err)
+		return count, lastId
+	}
+	return count, 0
+}
+
+/*
+原生sql的方式进行更新
+return:  影响的行数
+*/
+func Update4SQL(sql string, values ...interface{}) int64 {
+	return exec4SQL(sql, values...)
+}
+
+/*
+原生sql的方式进行删除
+return: 影响的行数
+*/
+func Delete4SQL(sql string, values ...interface{}) int64 {
+	return exec4SQL(sql, values...)
+}
+
+func exec4SQL(sql string, values ...interface{}) int64 {
+	o := orm.NewOrm()
+	res, err := o.Raw(sql, values...).Exec()
+	checkErr(err)
+	count, err := res.RowsAffected()
+	checkErr(err)
+	return count
+}

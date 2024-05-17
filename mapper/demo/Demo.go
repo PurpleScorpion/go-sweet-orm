@@ -177,7 +177,30 @@ func demo12() {
 	// 打印结果集 - 测试观察使用
 	pd, _ := json.Marshal(pageData)
 	fmt.Println(string(pd))
+}
 
+// 原生sql进行插入 - 自增主键
+func demo13() {
+	count, id := mapper.Insert4SQL(true, "insert into logs (log_time,log_type) values (?,?)", "2024-07-07 07:07:07", "system")
+	fmt.Println(count, id)
+}
+
+// 原生sql进行插入 - 非自增主键
+func demo14() {
+	count, _ := mapper.Insert4SQL(false, "insert into logs (log_time,log_type) values (?,?)", "2024-07-07 07:07:07", "system")
+	fmt.Println(count)
+}
+
+// 原生sql进行更新
+func demo15() {
+	count := mapper.Update4SQL("update logs set log_type = ? where id = ?", "sys", 1)
+	fmt.Println(count)
+}
+
+// 原生sql进行删除
+func demo16() {
+	count := mapper.Delete4SQL("delete from logs where id = ?", 1)
+	fmt.Println(count)
 }
 
 func isEmpty(str string) bool {
