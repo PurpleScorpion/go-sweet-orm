@@ -255,18 +255,31 @@ func checkParma(value interface{}) {
 	}
 	switch value.(type) {
 	case int:
+		return
 	case int8:
+		return
 	case int16:
+		return
 	case int32:
+		return
 	case int64:
+		return
 	case uint:
+		return
 	case uint8:
+		return
 	case uint16:
+		return
 	case uint32:
+		return
 	case uint64:
+		return
 	case float32:
+		return
 	case float64:
+		return
 	case bool:
+		return
 	case string:
 		return
 	default:
