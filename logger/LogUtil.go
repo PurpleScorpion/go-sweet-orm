@@ -1,7 +1,7 @@
 package logger
 
 import (
-	"github.com/beego/beego/v2/core/logs"
+	"log"
 )
 
 type LogUtil struct {
@@ -9,14 +9,14 @@ type LogUtil struct {
 
 func Info(format string) {
 	// 控制台打印
-	logs.Info(format)
+	log.Println(format)
 	// 文件记录
 }
 
 func Warn(format string) {
-	logs.Warn(format)
+	log.Println(format)
 }
 
 func Error(format string) {
-	logs.Error(format)
+	log.Println(format)
 }
