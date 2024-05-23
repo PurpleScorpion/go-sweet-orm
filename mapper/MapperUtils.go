@@ -2,7 +2,7 @@ package mapper
 
 import (
 	"fmt"
-	"go-sweet-orm/logger"
+	"github.com/PurpleScorpion/go-sweet-orm/logger"
 	"reflect"
 	"strings"
 )

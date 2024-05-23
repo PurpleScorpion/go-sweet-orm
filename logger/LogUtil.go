@@ -1,8 +1,8 @@
 package logger
 
 import (
+	"github.com/PurpleScorpion/go-sweet-orm/utils"
 	"github.com/beego/beego/v2/core/logs"
-	"go-sweet-orm/utils"
 	"os"
 )
 
