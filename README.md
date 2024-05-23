@@ -7,13 +7,20 @@
  - 目前仅支持mysql和sqlite
 ### 使用方式
 
- - 1 需要在init函数中写入如下语句进行初始化mapper , 然后将该项目下的文件夹复制到其项目下即可,需要注意引用包的路径更改
-   ```go
-    mapper.InitMapper(mapper.Sqlite, true)
+ - 1 引入包 
+   ```text
+    go get github.com/PurpleScorpion/go-sweet-orm
+    
    ```
    ```text
+    使用以下语句来引入包
+    import "github.com/PurpleScorpion/go-sweet-orm/mapper"
+    使用以下函数注册驱动 , 注意 需要先在beego中完成数据库注册
+    mapper.InitMapper(mapper.Sqlite, true)
+    参数一: 
     mapper.Sqlite代表注册驱动为sqlite3
     mapper.MySQL代表注册驱动为mysql
+    参数二:
     第二个参数为是否开启sql展示 true:开启/false:不开启
    ```
    - 2 包含的函数
