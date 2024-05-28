@@ -182,9 +182,9 @@ func Update(qw QueryWrapper) int64 {
 			continue
 		}
 		if i == len(qw.updates)-1 {
-			baseSQL = fmt.Sprintf("%s set %s = ?, ", baseSQL, qw.updates[i].columns)
-		} else {
 			baseSQL = fmt.Sprintf("%s set %s = ? ", baseSQL, qw.updates[i].columns)
+		} else {
+			baseSQL = fmt.Sprintf("%s set %s = ?, ", baseSQL, qw.updates[i].columns)
 		}
 		values = append(values, qw.updates[i].values)
 	}
