@@ -180,6 +180,7 @@ func Update(qw QueryWrapper) int64 {
 
 	if len(qw.updates) == 1 {
 		baseSQL = fmt.Sprintf("%s set %s = ? ", baseSQL, qw.updates[0].columns)
+		values = append(values, qw.updates[0].values)
 	} else {
 		for i := 0; i < len(qw.updates); i++ {
 			if !qw.updates[i].condition {
