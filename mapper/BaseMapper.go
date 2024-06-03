@@ -177,17 +177,23 @@ func Update(qw QueryWrapper) int64 {
 	}
 	values := make([]interface{}, 0)
 	baseSQL := fmt.Sprintf("update %s ", tableName)
-	for i := 0; i < len(qw.updates); i++ {
-		if !qw.updates[i].condition {
-			continue
+
+	if len(qw.updates) == 1 {
+		baseSQL = fmt.Sprintf("%s set %s = ?, ", baseSQL, qw.updates[0].columns)
+	} else {
+		for i := 0; i < len(qw.updates); i++ {
+			if !qw.updates[i].condition {
+				continue
+			}
+			if i == len(qw.updates)-1 {
+				baseSQL = fmt.Sprintf("%s %s = ? ", baseSQL, qw.updates[i].columns)
+			} else {
+				baseSQL = fmt.Sprintf("%s set %s = ?, ", baseSQL, qw.updates[i].columns)
+			}
+			values = append(values, qw.updates[i].values)
 		}
-		if i == len(qw.updates)-1 {
-			baseSQL = fmt.Sprintf("%s %s = ? ", baseSQL, qw.updates[i].columns)
-		} else {
-			baseSQL = fmt.Sprintf("%s set %s = ?, ", baseSQL, qw.updates[i].columns)
-		}
-		values = append(values, qw.updates[i].values)
 	}
+
 	baseSQL = fmt.Sprintf("%s where 1=1 ", baseSQL)
 	sql, vals := getQuerySQL(qw)
 
