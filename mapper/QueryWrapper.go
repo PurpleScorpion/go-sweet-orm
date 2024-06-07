@@ -106,13 +106,110 @@ func (q *QueryWrapper) IsNotNull(flag bool, column string) *QueryWrapper {
 	return addCondition(flag, column, "", q, "IS_NOT_NULL")
 }
 
-func (q *QueryWrapper) In(flag bool, column string, values []interface{}) *QueryWrapper {
+func (q *QueryWrapper) In(flag bool, column string, values ...interface{}) *QueryWrapper {
 	checkParmas(values)
 	return addConditionVals(flag, column, values, q, "IN")
 }
-func (q *QueryWrapper) NotIn(flag bool, column string, values []interface{}) *QueryWrapper {
+
+func (q *QueryWrapper) InInt32(flag bool, column string, values []int32) *QueryWrapper {
+	var interfaces []interface{}
+	for _, s := range values {
+		interfaces = append(interfaces, s)
+	}
+	return addConditionVals(flag, column, interfaces, q, "IN")
+}
+
+func (q *QueryWrapper) InInt64(flag bool, column string, values []int64) *QueryWrapper {
+	var interfaces []interface{}
+	for _, s := range values {
+		interfaces = append(interfaces, s)
+	}
+	return addConditionVals(flag, column, interfaces, q, "IN")
+}
+
+func (q *QueryWrapper) InInt(flag bool, column string, values []int) *QueryWrapper {
+	var interfaces []interface{}
+	for _, s := range values {
+		interfaces = append(interfaces, s)
+	}
+	return addConditionVals(flag, column, interfaces, q, "IN")
+}
+
+func (q *QueryWrapper) InString(flag bool, column string, values []string) *QueryWrapper {
+	var interfaces []interface{}
+	for _, s := range values {
+		interfaces = append(interfaces, s)
+	}
+	return addConditionVals(flag, column, interfaces, q, "IN")
+}
+
+func (q *QueryWrapper) InFloat32(flag bool, column string, values []float32) *QueryWrapper {
+	var interfaces []interface{}
+	for _, s := range values {
+		interfaces = append(interfaces, s)
+	}
+	return addConditionVals(flag, column, interfaces, q, "IN")
+}
+
+func (q *QueryWrapper) InFloat64(flag bool, column string, values []float64) *QueryWrapper {
+	var interfaces []interface{}
+	for _, s := range values {
+		interfaces = append(interfaces, s)
+	}
+	return addConditionVals(flag, column, interfaces, q, "IN")
+}
+
+func (q *QueryWrapper) NotIn(flag bool, column string, values ...interface{}) *QueryWrapper {
 	checkParmas(values)
 	return addConditionVals(flag, column, values, q, "NOT_IN")
+}
+
+func (q *QueryWrapper) NotInInt(flag bool, column string, values []int) *QueryWrapper {
+	var interfaces []interface{}
+	for _, s := range values {
+		interfaces = append(interfaces, s)
+	}
+	return addConditionVals(flag, column, interfaces, q, "NOT_IN")
+}
+
+func (q *QueryWrapper) NotInInt32(flag bool, column string, values []int32) *QueryWrapper {
+	var interfaces []interface{}
+	for _, s := range values {
+		interfaces = append(interfaces, s)
+	}
+	return addConditionVals(flag, column, interfaces, q, "NOT_IN")
+}
+
+func (q *QueryWrapper) NotInInt64(flag bool, column string, values []int64) *QueryWrapper {
+	var interfaces []interface{}
+	for _, s := range values {
+		interfaces = append(interfaces, s)
+	}
+	return addConditionVals(flag, column, interfaces, q, "NOT_IN")
+}
+
+func (q *QueryWrapper) NotInString(flag bool, column string, values []string) *QueryWrapper {
+	var interfaces []interface{}
+	for _, s := range values {
+		interfaces = append(interfaces, s)
+	}
+	return addConditionVals(flag, column, interfaces, q, "NOT_IN")
+}
+
+func (q *QueryWrapper) NotInFloat32(flag bool, column string, values []float32) *QueryWrapper {
+	var interfaces []interface{}
+	for _, s := range values {
+		interfaces = append(interfaces, s)
+	}
+	return addConditionVals(flag, column, interfaces, q, "NOT_IN")
+}
+
+func (q *QueryWrapper) NotInFloat64(flag bool, column string, values []float64) *QueryWrapper {
+	var interfaces []interface{}
+	for _, s := range values {
+		interfaces = append(interfaces, s)
+	}
+	return addConditionVals(flag, column, interfaces, q, "NOT_IN")
 }
 
 func (q *QueryWrapper) Between(flag bool, column string, from string, to string) *QueryWrapper {
