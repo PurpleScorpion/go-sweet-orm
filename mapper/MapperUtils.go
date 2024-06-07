@@ -32,9 +32,9 @@ func InitMapper(activeDB string, activeLog bool) {
 	ActiveLog = activeLog
 }
 
-func removeFalseUpdates(qw QueryWrapper) {
+func removeFalseUpdates(qw QueryWrapper) QueryWrapper {
 	if qw.updates == nil || len(qw.updates) == 0 {
-		return
+		return qw
 	}
 	var updateset []updateSet
 	for i := 0; i < len(qw.updates); i++ {
@@ -43,6 +43,7 @@ func removeFalseUpdates(qw QueryWrapper) {
 		}
 	}
 	qw.updates = updateset
+	return qw
 }
 
 // 查询sql组合器

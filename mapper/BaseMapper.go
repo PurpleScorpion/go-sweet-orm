@@ -179,7 +179,7 @@ func Update(qw QueryWrapper) int64 {
 	baseSQL := fmt.Sprintf("update %s ", tableName)
 
 	// 去除flage为false的更新字段
-	removeFalseUpdates(qw)
+	qw = removeFalseUpdates(qw)
 
 	if len(qw.updates) == 1 {
 		baseSQL = fmt.Sprintf("%s set %s = ? ", baseSQL, qw.updates[0].columns)
