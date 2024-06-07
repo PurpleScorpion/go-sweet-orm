@@ -32,6 +32,19 @@ func InitMapper(activeDB string, activeLog bool) {
 	ActiveLog = activeLog
 }
 
+func removeFalseUpdates(qw QueryWrapper) {
+	if qw.updates == nil || len(qw.updates) == 0 {
+		return
+	}
+	var updateset []updateSet
+	for i := 0; i < len(qw.updates); i++ {
+		if qw.updates[i].condition {
+			updateset = append(updateset, qw.updates[i])
+		}
+	}
+	qw.updates = updateset
+}
+
 // 查询sql组合器
 func queryWrapper4SQL(qw QueryWrapper) (string, []interface{}) {
 	baseSQL, values := getQuerySQL(qw)
