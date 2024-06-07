@@ -107,11 +107,11 @@ func (q *QueryWrapper) IsNotNull(flag bool, column string) *QueryWrapper {
 }
 
 func (q *QueryWrapper) In(flag bool, column string, values ...interface{}) *QueryWrapper {
-	checkParmas(values)
+	checkParmas(values...)
 	return addConditionVals(flag, column, values, q, "IN")
 }
 func (q *QueryWrapper) NotIn(flag bool, column string, values ...interface{}) *QueryWrapper {
-	checkParmas(values)
+	checkParmas(values...)
 	return addConditionVals(flag, column, values, q, "NOT_IN")
 }
 
@@ -180,7 +180,7 @@ func addConditionVals(flag bool, column string, value []interface{}, q *QueryWra
 	return q
 }
 
-func checkParmas(values []interface{}) {
+func checkParmas(values ...interface{}) {
 	if values == nil {
 		panic("The parameter type must be an integer, float, or string type")
 	}
