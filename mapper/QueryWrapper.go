@@ -251,9 +251,9 @@ func likeValue(value interface{}, sqlKeyword string) interface{} {
 
 func checkParma(value interface{}) {
 	if value == nil {
-		panic("The parameter type must be an integer, float, or string type")
+		panic("Parameter cannot be empty")
 	}
-	switch value.(type) {
+	switch tp := value.(type) {
 	case int:
 		return
 	case int8:
@@ -284,7 +284,7 @@ func checkParma(value interface{}) {
 		return
 	default:
 		// 都不是，返回错误
-		panic("The parameter type must be an integer, float, or string type")
+		panic(fmt.Sprintf("The parameter type must be an integer, float, or string type, but the type is %v", tp))
 	}
 }
 
