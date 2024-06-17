@@ -1,22 +1,23 @@
 package logger
 
 import (
+	"fmt"
 	"log"
 )
 
 type LogUtil struct {
 }
 
-func Info(format string) {
+func Info(format string, data ...interface{}) {
 	// 控制台打印
-	log.Println(format)
+	log.Println(fmt.Sprintf(format, data...))
 	// 文件记录
 }
 
-func Warn(format string) {
-	log.Println(format)
+func Warn(format string, data ...interface{}) {
+	log.Println(fmt.Sprintf(format, data...))
 }
 
-func Error(format string) {
-	log.Println(format)
+func Error(format string, data ...interface{}) {
+	log.Println(fmt.Sprintf(format, data...))
 }
