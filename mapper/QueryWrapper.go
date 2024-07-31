@@ -2,6 +2,7 @@ package mapper
 
 import (
 	"fmt"
+	"github.com/beego/beego/orm"
 	"reflect"
 	"strconv"
 )
@@ -12,6 +13,7 @@ type QueryWrapper struct {
 	sorts   []querySort
 	updates []updateSet
 	lastSQL string
+	o       orm.Ormer
 }
 
 type queryCriteria struct {
@@ -46,6 +48,39 @@ type querySort struct {
 
 func BuilderQueryWrapper(list interface{}) QueryWrapper {
 	var qw QueryWrapper
+	qw.resList = list
+	return qw
+}
+
+/*
+是否开启事务
+*/
+func BuilderInsertWrapper(list interface{}, flag bool) QueryWrapper {
+	var qw QueryWrapper
+	qw.o = orm.NewOrm()
+	if flag {
+		qw.o.Begin()
+	}
+	qw.resList = list
+	return qw
+}
+
+func BuilderUpdateWrapper(list interface{}, flag bool) QueryWrapper {
+	var qw QueryWrapper
+	qw.o = orm.NewOrm()
+	if flag {
+		qw.o.Begin()
+	}
+	qw.resList = list
+	return qw
+}
+
+func BuilderDeleteWrapper(list interface{}, flag bool) QueryWrapper {
+	var qw QueryWrapper
+	qw.o = orm.NewOrm()
+	if flag {
+		qw.o.Begin()
+	}
 	qw.resList = list
 	return qw
 }

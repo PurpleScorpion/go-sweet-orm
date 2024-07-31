@@ -116,8 +116,13 @@ func Delete(qw QueryWrapper) int64 {
 	if tableName == "null" {
 		panic("TableName method does not exist")
 	}
+	var o orm.Ormer
+	if qw.o != nil {
+		o = qw.o
+	} else {
+		o = orm.NewOrm()
+	}
 
-	o := orm.NewOrm()
 	baseSQL := fmt.Sprintf("delete from %s where 1=1 ", tableName)
 	// 查询组合器
 	sql, values := getQuerySQL(qw)
@@ -136,7 +141,15 @@ func Delete(qw QueryWrapper) int64 {
 	return count
 }
 
+func (qw *QueryWrapper) DeleteById(obj interface{}, id interface{}) int64 {
+	return delById(obj, id, qw.o)
+}
+
 func DeleteById(obj interface{}, id interface{}) int64 {
+	return delById(obj, id, nil)
+}
+
+func delById(obj interface{}, id interface{}, o orm.Ormer) int64 {
 	idFieldName := getTableId(obj)
 	if idFieldName == "null" {
 		panic("Field 'Primary key' does not exist , Please check if the Tag of the primary key attribute in the entity class contains the tableId attribute")
@@ -151,7 +164,9 @@ func DeleteById(obj interface{}, id interface{}) int64 {
 	if tp == "null" {
 		panic("Input is neither a slice nor a struct")
 	}
-	o := orm.NewOrm()
+	if o == nil {
+		o = orm.NewOrm()
+	}
 	sql := fmt.Sprintf("delete from %s where %s = ?", tableName, idFieldName)
 	LogInfo("DeleteById", fmt.Sprintf("Preparing: %s", sql))
 	LogInfo("DeleteById", fmt.Sprintf("Parameters: %v", id))
@@ -213,7 +228,13 @@ func Update(qw QueryWrapper) int64 {
 	}
 	LogInfo("Update", fmt.Sprintf("Preparing: %s", baseSQL))
 	LogInfo("Update", fmt.Sprintf("Parameters: %v", values))
-	o := orm.NewOrm()
+	var o orm.Ormer
+	if qw.o != nil {
+		o = qw.o
+	} else {
+		o = orm.NewOrm()
+	}
+
 	res, err := o.Raw(baseSQL, values...).Exec()
 	checkErr(err)
 	count, err := res.RowsAffected()
@@ -221,19 +242,31 @@ func Update(qw QueryWrapper) int64 {
 	return count
 }
 
+func (qw *QueryWrapper) Insert(pojo interface{}, excludeField ...string) int64 {
+	return baseInsert(pojo, qw.o, true, true, excludeField...)
+}
+
 // 默认 自增主键和空值排除的新增
 func Insert(pojo interface{}, excludeField ...string) int64 {
-	return baseInsert(pojo, true, true, excludeField...)
+	return baseInsert(pojo, nil, true, true, excludeField...)
+}
+
+func (qw *QueryWrapper) InsertAutoId(pojo interface{}, excludeEmpty bool, excludeField ...string) int64 {
+	return baseInsert(pojo, qw.o, true, excludeEmpty, excludeField...)
 }
 
 // 默认自增主键和自定义是否排除空值的新增
 func InsertAutoId(pojo interface{}, excludeEmpty bool, excludeField ...string) int64 {
-	return baseInsert(pojo, true, excludeEmpty, excludeField...)
+	return baseInsert(pojo, nil, true, excludeEmpty, excludeField...)
+}
+
+func (qw *QueryWrapper) InsertCustom(pojo interface{}, autoId bool, excludeEmpty bool, excludeField ...string) int64 {
+	return baseInsert(pojo, qw.o, autoId, excludeEmpty, excludeField...)
 }
 
 // 完全自定义的新增
 func InsertCustom(pojo interface{}, autoId bool, excludeEmpty bool, excludeField ...string) int64 {
-	return baseInsert(pojo, autoId, excludeEmpty, excludeField...)
+	return baseInsert(pojo, nil, autoId, excludeEmpty, excludeField...)
 }
 
 /*
@@ -242,7 +275,7 @@ autoId: 是否为自增主键
 excludeEmpty: 是否排除空值
 excludeField: 排除字段 - 数据库表字段名
 */
-func baseInsert(pojo interface{}, autoId bool, excludeEmpty bool, excludeField ...string) int64 {
+func baseInsert(pojo interface{}, o orm.Ormer, autoId bool, excludeEmpty bool, excludeField ...string) int64 {
 	idFieldName := getTableId(pojo)
 	if idFieldName == "null" {
 		panic("Field 'Primary key' does not exist , Please check if the Tag of the primary key attribute in the entity class contains the tableId attribute")
@@ -283,7 +316,9 @@ func baseInsert(pojo interface{}, autoId bool, excludeEmpty bool, excludeField .
 	baseSQL := fmt.Sprintf("insert into %s %s values %s", tableName, str1, str2)
 	LogInfo("Insert", fmt.Sprintf("Preparing: %s", baseSQL))
 	LogInfo("Insert", fmt.Sprintf("Parameters: %v", values))
-	o := orm.NewOrm()
+	if o == nil {
+		o = orm.NewOrm()
+	}
 	res, err := o.Raw(baseSQL, values...).Exec()
 	checkErr(err)
 	if autoId {
@@ -341,12 +376,30 @@ func Insert4SQL(autoId bool, sql string, values ...interface{}) (int64, int64) {
 	return count, 0
 }
 
+func (qw *QueryWrapper) Insert4SQL(autoId bool, sql string, values ...interface{}) (int64, int64) {
+	o := qw.o
+	res, err := o.Raw(sql, values...).Exec()
+	checkErr(err)
+	count, err := res.RowsAffected()
+	checkErr(err)
+	if autoId {
+		lastId, err := res.LastInsertId()
+		checkErr(err)
+		return count, lastId
+	}
+	return count, 0
+}
+
 /*
 原生sql的方式进行更新
 return:  影响的行数
 */
 func Update4SQL(sql string, values ...interface{}) int64 {
-	return exec4SQL(sql, values...)
+	return exec4SQL(sql, nil, values...)
+}
+
+func (qw *QueryWrapper) Update4SQL(sql string, values ...interface{}) int64 {
+	return exec4SQL(sql, qw.o, values...)
 }
 
 /*
@@ -354,14 +407,32 @@ func Update4SQL(sql string, values ...interface{}) int64 {
 return: 影响的行数
 */
 func Delete4SQL(sql string, values ...interface{}) int64 {
-	return exec4SQL(sql, values...)
+	return exec4SQL(sql, nil, values...)
 }
 
-func exec4SQL(sql string, values ...interface{}) int64 {
-	o := orm.NewOrm()
+func (qw *QueryWrapper) Delete4SQL(sql string, values ...interface{}) int64 {
+	return exec4SQL(sql, qw.o, values...)
+}
+
+func exec4SQL(sql string, o orm.Ormer, values ...interface{}) int64 {
+	if o == nil {
+		o = orm.NewOrm()
+	}
 	res, err := o.Raw(sql, values...).Exec()
 	checkErr(err)
 	count, err := res.RowsAffected()
 	checkErr(err)
 	return count
+}
+
+func (qw *QueryWrapper) BenginTransaction() error {
+	return qw.o.Begin()
+}
+
+func (qw *QueryWrapper) Commit() error {
+	return qw.o.Commit()
+}
+
+func (qw *QueryWrapper) Rollback() error {
+	return qw.o.Rollback()
 }
