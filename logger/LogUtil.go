@@ -11,7 +11,6 @@ type LogUtil struct {
 func Info(format string, data ...interface{}) {
 	// 控制台打印
 	log.Println(fmt.Sprintf(format, data...))
-	// 文件记录
 }
 
 func Warn(format string, data ...interface{}) {

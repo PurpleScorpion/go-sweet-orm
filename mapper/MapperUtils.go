@@ -560,7 +560,7 @@ func addTableCache(tp string, name string, cacheName string) {
 
 func checkErr(err error) {
 	if err != nil {
-		panic(err)
+		logger.Info("database error: %v", err)
 	}
 }
 
@@ -598,6 +598,6 @@ func saveLastInsertId(T interface{}, lastId int64) {
 
 func LogInfo(methodName string, format string) {
 	if ActiveLog {
-		logger.Info(fmt.Sprintf("[%s]: ==> %s", methodName, format))
+		logger.Info("[%s]: ==> %s", methodName, format)
 	}
 }
