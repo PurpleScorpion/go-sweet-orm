@@ -1,6 +1,7 @@
 package mapper
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/beego/beego/orm"
@@ -28,7 +29,7 @@ func Page(page PageUtils) PageData {
  * 1. 当传入为对象类型时, 会将结果集封装为一个对象(不推荐,因为go的空值没有null这个结果,只能判断id是否为0)
  * 2. 当传入对象为数组类型时 , 会将结果集封装为一个数组(推荐,可以通过判断数组length是否为0来判断是否存在数据)
  */
-func SelectById(obj interface{}, id interface{}) {
+func SelectById(obj interface{}, id interface{}) error {
 	idFieldName := getTableId(obj)
 	if idFieldName == "null" {
 		panic("Field 'Primary key' does not exist , Please check if the Tag of the primary key attribute in the entity class contains the tableId attribute")
@@ -45,6 +46,9 @@ func SelectById(obj interface{}, id interface{}) {
 	}
 
 	o := orm.NewOrm()
+	if o == nil {
+		return errors.New("orm is nil")
+	}
 
 	sql := fmt.Sprintf("select * from %s where %s = ?", tableName, idFieldName)
 	LogInfo("SelectById", fmt.Sprintf("Preparing: %s", sql))
@@ -52,13 +56,20 @@ func SelectById(obj interface{}, id interface{}) {
 	r := o.Raw(sql, id)
 
 	if tp == "Array" {
-		r.QueryRows(obj)
+		_, err := r.QueryRows(obj)
+		if err != nil {
+			return err
+		}
 	} else {
-		r.QueryRow(obj)
+		err := r.QueryRow(obj)
+		if err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
-func SelectList(qw QueryWrapper) {
+func SelectList(qw QueryWrapper) error {
 	resList := qw.resList
 	tp := getParmaStruct(resList)
 	if tp == "null" {
@@ -78,9 +89,16 @@ func SelectList(qw QueryWrapper) {
 	LogInfo("SelectList", fmt.Sprintf("Preparing: %s", baseSQL))
 	LogInfo("SelectList", fmt.Sprintf("Parameters: %v", values))
 	o := orm.NewOrm()
+	if o == nil {
+		return errors.New("orm is nil")
+	}
 	r := o.Raw(baseSQL, values...)
-	r.QueryRows(resList)
+	_, err := r.QueryRows(resList)
+	if err != nil {
+		return err
+	}
 	qw.resList = resList
+	return nil
 }
 
 func SelectCount(qw QueryWrapper) int64 {
@@ -102,7 +120,13 @@ func SelectCount(qw QueryWrapper) int64 {
 	LogInfo("SelectCount", fmt.Sprintf("Parameters: %v", values))
 	var count int64
 	o := orm.NewOrm()
-	o.Raw(baseSQL, values...).QueryRow(&count)
+	if o == nil {
+		return 0
+	}
+	err := o.Raw(baseSQL, values...).QueryRow(&count)
+	if err != nil {
+		return 0
+	}
 	return count
 }
 
@@ -122,6 +146,9 @@ func Delete(qw QueryWrapper) int64 {
 	} else {
 		o = orm.NewOrm()
 	}
+	if o == nil {
+		return 0
+	}
 
 	baseSQL := fmt.Sprintf("delete from %s where 1=1 ", tableName)
 	// 查询组合器
@@ -136,8 +163,14 @@ func Delete(qw QueryWrapper) int64 {
 	LogInfo("Delete", fmt.Sprintf("Parameters: %v", values))
 	res, err := o.Raw(baseSQL, values...).Exec()
 	checkErr(err)
+	if err != nil {
+		return 0
+	}
 	count, err := res.RowsAffected()
 	checkErr(err)
+	if err != nil {
+		return 0
+	}
 	return count
 }
 
@@ -167,13 +200,22 @@ func delById(obj interface{}, id interface{}, o orm.Ormer) int64 {
 	if o == nil {
 		o = orm.NewOrm()
 	}
+	if o == nil {
+		return 0
+	}
 	sql := fmt.Sprintf("delete from %s where %s = ?", tableName, idFieldName)
 	LogInfo("DeleteById", fmt.Sprintf("Preparing: %s", sql))
 	LogInfo("DeleteById", fmt.Sprintf("Parameters: %v", id))
 	res, err := o.Raw(sql, id).Exec()
 	checkErr(err)
+	if err != nil {
+		return 0
+	}
 	count, err := res.RowsAffected()
 	checkErr(err)
+	if err != nil {
+		return 0
+	}
 	return count
 }
 
@@ -234,11 +276,20 @@ func Update(qw QueryWrapper) int64 {
 	} else {
 		o = orm.NewOrm()
 	}
+	if o == nil {
+		return 0
+	}
 
 	res, err := o.Raw(baseSQL, values...).Exec()
 	checkErr(err)
+	if err != nil {
+		return 0
+	}
 	count, err := res.RowsAffected()
 	checkErr(err)
+	if err != nil {
+		return 0
+	}
 	return count
 }
 
@@ -319,25 +370,43 @@ func baseInsert(pojo interface{}, o orm.Ormer, autoId bool, excludeEmpty bool, e
 	if o == nil {
 		o = orm.NewOrm()
 	}
+	if o == nil {
+		return 0
+	}
 	res, err := o.Raw(baseSQL, values...).Exec()
 	checkErr(err)
+	if err != nil {
+		return 0
+	}
 	if autoId {
-		lastId, err := res.LastInsertId()
-		checkErr(err)
+		lastId, err1 := res.LastInsertId()
+		checkErr(err1)
+		if err1 != nil {
+			return 0
+		}
 		saveLastInsertId(pojo, lastId)
 	}
 	count, err := res.RowsAffected()
 	checkErr(err)
+	if err != nil {
+		return 0
+	}
 	return count
 }
 
 func SelectCount4SQL(sql string, values ...interface{}) int64 {
 	var count int64
 	o := orm.NewOrm()
-	o.Raw(sql, values...).QueryRow(&count)
+	if o == nil {
+		return 0
+	}
+	err := o.Raw(sql, values...).QueryRow(&count)
+	if err != nil {
+		return 0
+	}
 	return count
 }
-func SelectList4SQL(resList interface{}, sql string, values ...interface{}) {
+func SelectList4SQL(resList interface{}, sql string, values ...interface{}) error {
 	tp := getParmaStruct(resList)
 	if tp == "null" {
 		panic("Input is neither a slice nor a struct")
@@ -346,8 +415,15 @@ func SelectList4SQL(resList interface{}, sql string, values ...interface{}) {
 		panic("The result set parameter must be of array type")
 	}
 	o := orm.NewOrm()
+	if o == nil {
+		return errors.New("orm is nil")
+	}
 	r := o.Raw(sql, values...)
-	r.QueryRows(resList)
+	_, err := r.QueryRows(resList)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 /*
@@ -364,13 +440,25 @@ return:
 */
 func Insert4SQL(autoId bool, sql string, values ...interface{}) (int64, int64) {
 	o := orm.NewOrm()
+	if o == nil {
+		return 0, 0
+	}
 	res, err := o.Raw(sql, values...).Exec()
 	checkErr(err)
+	if err != nil {
+		return 0, 0
+	}
 	count, err := res.RowsAffected()
 	checkErr(err)
+	if err != nil {
+		return 0, 0
+	}
 	if autoId {
-		lastId, err := res.LastInsertId()
-		checkErr(err)
+		lastId, err1 := res.LastInsertId()
+		checkErr(err1)
+		if err1 != nil {
+			return 0, 0
+		}
 		return count, lastId
 	}
 	return count, 0
@@ -378,13 +466,25 @@ func Insert4SQL(autoId bool, sql string, values ...interface{}) (int64, int64) {
 
 func (qw *QueryWrapper) Insert4SQL(autoId bool, sql string, values ...interface{}) (int64, int64) {
 	o := qw.o
+	if o == nil {
+		return 0, 0
+	}
 	res, err := o.Raw(sql, values...).Exec()
 	checkErr(err)
+	if err != nil {
+		return 0, 0
+	}
 	count, err := res.RowsAffected()
 	checkErr(err)
+	if err != nil {
+		return 0, 0
+	}
 	if autoId {
-		lastId, err := res.LastInsertId()
-		checkErr(err)
+		lastId, err1 := res.LastInsertId()
+		checkErr(err1)
+		if err1 != nil {
+			return 0, 0
+		}
 		return count, lastId
 	}
 	return count, 0
@@ -418,21 +518,39 @@ func exec4SQL(sql string, o orm.Ormer, values ...interface{}) int64 {
 	if o == nil {
 		o = orm.NewOrm()
 	}
+	if o == nil {
+		return 0
+	}
 	res, err := o.Raw(sql, values...).Exec()
 	checkErr(err)
+	if err != nil {
+		return 0
+	}
 	count, err := res.RowsAffected()
 	checkErr(err)
+	if err != nil {
+		return 0
+	}
 	return count
 }
 
 func (qw *QueryWrapper) BenginTransaction() error {
+	if qw.o == nil {
+		return errors.New("orm is nil")
+	}
 	return qw.o.Begin()
 }
 
 func (qw *QueryWrapper) Commit() error {
+	if qw.o == nil {
+		return errors.New("orm is nil")
+	}
 	return qw.o.Commit()
 }
 
 func (qw *QueryWrapper) Rollback() error {
+	if qw.o == nil {
+		return errors.New("orm is nil")
+	}
 	return qw.o.Rollback()
 }
