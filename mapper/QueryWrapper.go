@@ -2,7 +2,6 @@ package mapper
 
 import (
 	"fmt"
-	"github.com/beego/beego/orm"
 	"reflect"
 	"strconv"
 )
@@ -11,9 +10,7 @@ type QueryWrapper struct {
 	resList interface{}
 	query   []queryCriteria
 	sorts   []querySort
-	updates []updateSet
 	lastSQL string
-	o       orm.Ormer
 }
 
 type queryCriteria struct {
@@ -50,45 +47,6 @@ func BuilderQueryWrapper(list interface{}) QueryWrapper {
 	var qw QueryWrapper
 	qw.resList = list
 	return qw
-}
-
-/*
-是否开启事务
-*/
-func BuilderInsertWrapper(list interface{}, flag bool) QueryWrapper {
-	var qw QueryWrapper
-	qw.o = orm.NewOrm()
-	if flag {
-		qw.o.Begin()
-	}
-	qw.resList = list
-	return qw
-}
-
-func BuilderUpdateWrapper(list interface{}, flag bool) QueryWrapper {
-	var qw QueryWrapper
-	qw.o = orm.NewOrm()
-	if flag {
-		qw.o.Begin()
-	}
-	qw.resList = list
-	return qw
-}
-
-func BuilderDeleteWrapper(list interface{}, flag bool) QueryWrapper {
-	var qw QueryWrapper
-	qw.o = orm.NewOrm()
-	if flag {
-		qw.o.Begin()
-	}
-	qw.resList = list
-	return qw
-}
-
-func (q *QueryWrapper) Set(flag bool, column string, value interface{}) *QueryWrapper {
-	checkParma(value)
-	q.updates = append(q.updates, updateSet{condition: flag, columns: column, values: value})
-	return q
 }
 
 func (q *QueryWrapper) Eq(flag bool, column string, value interface{}) *QueryWrapper {
@@ -302,6 +260,7 @@ func addCondition(flag bool, column string, value interface{}, q *QueryWrapper, 
 	})
 	return q
 }
+
 func addConditionVals(flag bool, column string, value []interface{}, q *QueryWrapper, sqlKeyword string) *QueryWrapper {
 	q.query = append(q.query, queryCriteria{
 		condition: flag,

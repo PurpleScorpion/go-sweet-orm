@@ -3,6 +3,7 @@ package mapper
 import (
 	"fmt"
 	"github.com/PurpleScorpion/go-sweet-orm/logger"
+	"github.com/beego/beego/v2/client/orm"
 	"reflect"
 	"strings"
 )
@@ -19,6 +20,7 @@ var (
 	Sqlite          = "sqlite3"
 	ActiveDB        = ""
 	ActiveLog       = false
+	o               orm.Ormer
 )
 
 func InitMapper(activeDB string, activeLog bool) {
@@ -30,9 +32,14 @@ func InitMapper(activeDB string, activeLog bool) {
 	}
 	ActiveDB = activeDB
 	ActiveLog = activeLog
+	o = orm.NewOrm()
 }
 
-func removeFalseUpdates(qw QueryWrapper) QueryWrapper {
+func GetOrm() orm.Ormer {
+	return o
+}
+
+func (qw *UpdateWrapper) removeFalseUpdates() *UpdateWrapper {
 	if qw.updates == nil || len(qw.updates) == 0 {
 		return qw
 	}
@@ -47,8 +54,8 @@ func removeFalseUpdates(qw QueryWrapper) QueryWrapper {
 }
 
 // 查询sql组合器
-func queryWrapper4SQL(qw QueryWrapper) (string, []interface{}) {
-	baseSQL, values := getQuerySQL(qw)
+func (qw *QueryWrapper) queryWrapper4SQL() (string, []interface{}) {
+	baseSQL, values := getQuerySQL(qw.query)
 	if qw.sorts != nil || len(qw.sorts) > 0 {
 		sorts := qw.sorts
 		for i := 0; i < len(sorts); i++ {
@@ -80,10 +87,9 @@ func queryWrapper4SQL(qw QueryWrapper) (string, []interface{}) {
 	return baseSQL, values
 }
 
-func getQuerySQL(qw QueryWrapper) (string, []interface{}) {
+func getQuerySQL(querys []queryCriteria) (string, []interface{}) {
 	baseSQL := ""
 	values := make([]interface{}, 0)
-	querys := qw.query
 	if querys == nil {
 		return baseSQL, values
 	}
@@ -222,12 +228,15 @@ func getTableId4Object(T any, typeName string) string {
 		true: 将排除所有空值字段与数据
 		false: 不排除所有空值字段与数据
 */
-func getExcludeFiledName(T any, tableName string, excludeFields []string, autoId bool, idFieldName string, excludeEmpty bool) ([]string, []interface{}) {
+func getExcludeFiledName(T any, tableName string, excludeFields []string, idFieldName string, excludeEmpty bool) ([]string, []interface{}, bool) {
 	// 获取所有的数据库表字段名和传入的对象值
 	fields, values := getAllFiledName(T, tableName)
 	id := camelToUnderscore(idFieldName)
 	names := make([]string, 0)
 	vals := make([]interface{}, 0)
+
+	// 根据用户是否输入了ID来判断是否自增
+	autoId := hasEmptyId(fields, values, id)
 
 	for i := 0; i < len(fields); i++ {
 		field := fields[i]
@@ -248,7 +257,28 @@ func getExcludeFiledName(T any, tableName string, excludeFields []string, autoId
 		vals = append(vals, val)
 	}
 
-	return names, vals
+	return names, vals, autoId
+}
+
+/*
+主键是否为空
+
+	true: 空
+	false: 非空
+*/
+func hasEmptyId(fields []string, values []interface{}, idName string) bool {
+	var val interface{}
+	for i := 0; i < len(fields); i++ {
+		// 如果该字段是id
+		if fields[i] == idName {
+			val = values[i]
+			break
+		}
+	}
+	if val == nil {
+		return true
+	}
+	return hasEmptyVal(val)
 }
 
 func hasEmptyVal(val interface{}) bool {

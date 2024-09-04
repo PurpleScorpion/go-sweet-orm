@@ -3,8 +3,8 @@ package mapper
 import (
 	"errors"
 	"fmt"
-
-	"github.com/beego/beego/orm"
+	"github.com/PurpleScorpion/go-sweet-orm/logger"
+	"github.com/beego/beego/v2/client/orm"
 )
 
 type BaseMapper struct {
@@ -15,9 +15,12 @@ func Page(page PageUtils) PageData {
 	offSet := page.getOffSet()
 	pageSize := page.getPageSize()
 	qw.lastSQL = fmt.Sprintf("limit %d,%d", offSet, pageSize)
-	SelectList(qw)
+	err := qw.SelectList()
+	if err != nil {
+		panic(err)
+	}
 	qw.lastSQL = ""
-	count := SelectCount(qw)
+	count := qw.SelectCount()
 	page.setTotalSize(count)
 	pageData := page.pageData()
 	return pageData
@@ -45,16 +48,17 @@ func SelectById(obj interface{}, id interface{}) error {
 		panic("Input is neither a slice nor a struct")
 	}
 
-	o := orm.NewOrm()
 	if o == nil {
-		return errors.New("orm is nil")
+		return errors.New("orm is null")
 	}
 
 	sql := fmt.Sprintf("select * from %s where %s = ?", tableName, idFieldName)
 	LogInfo("SelectById", fmt.Sprintf("Preparing: %s", sql))
 	LogInfo("SelectById", fmt.Sprintf("Parameters: %v", id))
 	r := o.Raw(sql, id)
-
+	if r == nil {
+		return errors.New("RawSeter is null")
+	}
 	if tp == "Array" {
 		_, err := r.QueryRows(obj)
 		if err != nil {
@@ -69,7 +73,7 @@ func SelectById(obj interface{}, id interface{}) error {
 	return nil
 }
 
-func SelectList(qw QueryWrapper) error {
+func (qw *QueryWrapper) SelectList() error {
 	resList := qw.resList
 	tp := getParmaStruct(resList)
 	if tp == "null" {
@@ -83,16 +87,19 @@ func SelectList(qw QueryWrapper) error {
 		panic("TableName method does not exist")
 	}
 
-	baseSQL, values := queryWrapper4SQL(qw)
+	baseSQL, values := qw.queryWrapper4SQL()
 
 	baseSQL = fmt.Sprintf("select * from %s where 1=1 %s", tableName, baseSQL)
 	LogInfo("SelectList", fmt.Sprintf("Preparing: %s", baseSQL))
 	LogInfo("SelectList", fmt.Sprintf("Parameters: %v", values))
-	o := orm.NewOrm()
 	if o == nil {
 		return errors.New("orm is nil")
 	}
 	r := o.Raw(baseSQL, values...)
+	if r == nil {
+		return errors.New("RawSeter is null")
+	}
+
 	_, err := r.QueryRows(resList)
 	if err != nil {
 		return err
@@ -101,7 +108,7 @@ func SelectList(qw QueryWrapper) error {
 	return nil
 }
 
-func SelectCount(qw QueryWrapper) int64 {
+func (qw *QueryWrapper) SelectCount() int64 {
 	resList := qw.resList
 	tp := getParmaStruct(resList)
 	if tp == "null" {
@@ -111,7 +118,7 @@ func SelectCount(qw QueryWrapper) int64 {
 	if tableName == "null" {
 		panic("TableName method does not exist")
 	}
-	baseSQL, values := getQuerySQL(qw)
+	baseSQL, values := getQuerySQL(qw.query)
 	if !isEmpty(qw.lastSQL) {
 		baseSQL = fmt.Sprintf("%s %s", baseSQL, qw.lastSQL)
 	}
@@ -119,19 +126,24 @@ func SelectCount(qw QueryWrapper) int64 {
 	LogInfo("SelectCount", fmt.Sprintf("Preparing: %s", baseSQL))
 	LogInfo("SelectCount", fmt.Sprintf("Parameters: %v", values))
 	var count int64
-	o := orm.NewOrm()
 	if o == nil {
 		return 0
 	}
-	err := o.Raw(baseSQL, values...).QueryRow(&count)
+
+	r := o.Raw(baseSQL, values...)
+	if r == nil {
+		logger.Error("RawSeter is null")
+		return 0
+	}
+	err := r.QueryRow(&count)
 	if err != nil {
 		return 0
 	}
 	return count
 }
 
-func Delete(qw QueryWrapper) int64 {
-	resList := qw.resList
+func (qw *UpdateWrapper) Delete() int64 {
+	resList := qw.object
 	tp := getParmaStruct(resList)
 	if tp == "null" {
 		panic("Input is neither a slice nor a struct")
@@ -140,19 +152,14 @@ func Delete(qw QueryWrapper) int64 {
 	if tableName == "null" {
 		panic("TableName method does not exist")
 	}
-	var o orm.Ormer
-	if qw.o != nil {
-		o = qw.o
-	} else {
-		o = orm.NewOrm()
-	}
+
 	if o == nil {
 		return 0
 	}
 
 	baseSQL := fmt.Sprintf("delete from %s where 1=1 ", tableName)
 	// 查询组合器
-	sql, values := getQuerySQL(qw)
+	sql, values := getQuerySQL(qw.query)
 	// 拼接sql
 	baseSQL = fmt.Sprintf("%s %s ", baseSQL, sql)
 	// 拼接lastsql
@@ -161,28 +168,40 @@ func Delete(qw QueryWrapper) int64 {
 	}
 	LogInfo("Delete", fmt.Sprintf("Preparing: %s", baseSQL))
 	LogInfo("Delete", fmt.Sprintf("Parameters: %v", values))
-	res, err := o.Raw(baseSQL, values...).Exec()
-	checkErr(err)
-	if err != nil {
+	r := o.Raw(baseSQL, values...)
+	if r == nil {
+		logger.Error("RawSeter is null")
 		return 0
 	}
-	count, err := res.RowsAffected()
-	checkErr(err)
+	res, err := r.Exec()
 	if err != nil {
+		logger.Error("Delete failed: %v", err)
+		return 0
+	}
+	if res == nil {
+		logger.Error("Delete exec result is null")
+		return 0
+	}
+
+	count, err := res.RowsAffected()
+	if err != nil {
+		logger.Error("Delete RowsAffected failed: %v", err)
 		return 0
 	}
 	return count
 }
 
-func (qw *QueryWrapper) DeleteById(obj interface{}, id interface{}) int64 {
-	return delById(obj, id, qw.o)
+// 使用事务的删除
+func (qw *UpdateWrapper) DeleteById(id interface{}) int64 {
+	return delById(qw.object, id, qw)
 }
 
+// 不使用事务的快捷删除
 func DeleteById(obj interface{}, id interface{}) int64 {
 	return delById(obj, id, nil)
 }
 
-func delById(obj interface{}, id interface{}, o orm.Ormer) int64 {
+func delById(obj interface{}, id interface{}, qw *UpdateWrapper) int64 {
 	idFieldName := getTableId(obj)
 	if idFieldName == "null" {
 		panic("Field 'Primary key' does not exist , Please check if the Tag of the primary key attribute in the entity class contains the tableId attribute")
@@ -197,30 +216,78 @@ func delById(obj interface{}, id interface{}, o orm.Ormer) int64 {
 	if tp == "null" {
 		panic("Input is neither a slice nor a struct")
 	}
-	if o == nil {
-		o = orm.NewOrm()
+
+	if qw != nil {
+		return delById4Tx(idFieldName, tableName, id, qw)
 	}
+	return delById4NoTx(idFieldName, tableName, id)
+}
+
+func delById4Tx(idFieldName, tableName string, id interface{}, qw *UpdateWrapper) int64 {
+
+	if !qw.txFlag || qw.txOrmer == nil {
+		return delById4NoTx(idFieldName, tableName, id)
+	}
+	sql := fmt.Sprintf("delete from %s where %s = ?", tableName, idFieldName)
+	LogInfo("DeleteById", fmt.Sprintf("Preparing: %s", sql))
+	LogInfo("DeleteById", fmt.Sprintf("Parameters: %v", id))
+
+	r := qw.txOrmer.Raw(sql, id)
+	if r == nil {
+		logger.Error("RawSeter is null")
+		return 0
+	}
+	res, err := r.Exec()
+	if err != nil {
+		logger.Error("Delete failed: %v", err)
+		return 0
+	}
+	if res == nil {
+		logger.Error("Delete exec result is null")
+		return 0
+	}
+	count, err := res.RowsAffected()
+	if err != nil {
+		logger.Error("Delete RowsAffected failed: %v", err)
+		return 0
+	}
+	return count
+
+}
+
+func delById4NoTx(idFieldName, tableName string, id interface{}) int64 {
 	if o == nil {
 		return 0
 	}
 	sql := fmt.Sprintf("delete from %s where %s = ?", tableName, idFieldName)
 	LogInfo("DeleteById", fmt.Sprintf("Preparing: %s", sql))
 	LogInfo("DeleteById", fmt.Sprintf("Parameters: %v", id))
-	res, err := o.Raw(sql, id).Exec()
-	checkErr(err)
+
+	r := o.Raw(sql, id)
+	if r == nil {
+		logger.Error("RawSeter is null")
+		return 0
+	}
+	res, err := r.Exec()
+
 	if err != nil {
+		logger.Error("Delete failed: %v", err)
+		return 0
+	}
+	if res == nil {
+		logger.Error("Delete exec result is null")
 		return 0
 	}
 	count, err := res.RowsAffected()
-	checkErr(err)
 	if err != nil {
+		logger.Error("Delete RowsAffected failed: %v", err)
 		return 0
 	}
 	return count
 }
 
-func Update(qw QueryWrapper) int64 {
-	resList := qw.resList
+func (qw *UpdateWrapper) Update() int64 {
+	resList := qw.object
 	tp := getParmaStruct(resList)
 	if tp == "null" {
 		panic("Input is neither a slice nor a struct")
@@ -236,7 +303,7 @@ func Update(qw QueryWrapper) int64 {
 	baseSQL := fmt.Sprintf("update %s ", tableName)
 
 	// 去除flage为false的更新字段
-	qw = removeFalseUpdates(qw)
+	qw.removeFalseUpdates()
 
 	if len(qw.updates) == 1 {
 		baseSQL = fmt.Sprintf("%s set %s = ? ", baseSQL, qw.updates[0].columns)
@@ -258,7 +325,7 @@ func Update(qw QueryWrapper) int64 {
 	}
 
 	baseSQL = fmt.Sprintf("%s where 1=1 ", baseSQL)
-	sql, vals := getQuerySQL(qw)
+	sql, vals := getQuerySQL(qw.query)
 
 	baseSQL = fmt.Sprintf("%s %s ", baseSQL, sql)
 	if !isEmpty(qw.lastSQL) {
@@ -270,54 +337,46 @@ func Update(qw QueryWrapper) int64 {
 	}
 	LogInfo("Update", fmt.Sprintf("Preparing: %s", baseSQL))
 	LogInfo("Update", fmt.Sprintf("Parameters: %v", values))
-	var o orm.Ormer
-	if qw.o != nil {
-		o = qw.o
+
+	var r orm.RawSeter
+
+	if !qw.txFlag || qw.txOrmer == nil {
+		if o == nil {
+			return 0
+		}
+		r = o.Raw(baseSQL, values...)
 	} else {
-		o = orm.NewOrm()
+		r = qw.txOrmer.Raw(baseSQL, values...)
 	}
-	if o == nil {
+	if r == nil {
+		logger.Error("RawSeter is null")
 		return 0
 	}
-
-	res, err := o.Raw(baseSQL, values...).Exec()
-	checkErr(err)
+	res, err := r.Exec()
 	if err != nil {
+		logger.Error("Update failed: %v", err)
 		return 0
 	}
 	count, err := res.RowsAffected()
-	checkErr(err)
 	if err != nil {
+		logger.Error("Update RowsAffected failed: %v", err)
 		return 0
 	}
 	return count
+
 }
 
-func (qw *QueryWrapper) Insert(pojo interface{}, excludeField ...string) int64 {
-	return baseInsert(pojo, qw.o, true, true, excludeField...)
+func (qw *UpdateWrapper) Insert(pojo interface{}, excludeField ...string) int64 {
+	return baseInsert(pojo, true, qw, excludeField...)
 }
 
 // 默认 自增主键和空值排除的新增
 func Insert(pojo interface{}, excludeField ...string) int64 {
-	return baseInsert(pojo, nil, true, true, excludeField...)
+	return baseInsert(pojo, true, nil, excludeField...)
 }
 
-func (qw *QueryWrapper) InsertAutoId(pojo interface{}, excludeEmpty bool, excludeField ...string) int64 {
-	return baseInsert(pojo, qw.o, true, excludeEmpty, excludeField...)
-}
-
-// 默认自增主键和自定义是否排除空值的新增
-func InsertAutoId(pojo interface{}, excludeEmpty bool, excludeField ...string) int64 {
-	return baseInsert(pojo, nil, true, excludeEmpty, excludeField...)
-}
-
-func (qw *QueryWrapper) InsertCustom(pojo interface{}, autoId bool, excludeEmpty bool, excludeField ...string) int64 {
-	return baseInsert(pojo, qw.o, autoId, excludeEmpty, excludeField...)
-}
-
-// 完全自定义的新增
-func InsertCustom(pojo interface{}, autoId bool, excludeEmpty bool, excludeField ...string) int64 {
-	return baseInsert(pojo, nil, autoId, excludeEmpty, excludeField...)
+func (qw *UpdateWrapper) InsertCustom(pojo interface{}, excludeEmpty bool, excludeField ...string) int64 {
+	return baseInsert(pojo, excludeEmpty, qw, excludeField...)
 }
 
 /*
@@ -326,7 +385,7 @@ autoId: 是否为自增主键
 excludeEmpty: 是否排除空值
 excludeField: 排除字段 - 数据库表字段名
 */
-func baseInsert(pojo interface{}, o orm.Ormer, autoId bool, excludeEmpty bool, excludeField ...string) int64 {
+func baseInsert(pojo interface{}, excludeEmpty bool, qw *UpdateWrapper, excludeField ...string) int64 {
 	idFieldName := getTableId(pojo)
 	if idFieldName == "null" {
 		panic("Field 'Primary key' does not exist , Please check if the Tag of the primary key attribute in the entity class contains the tableId attribute")
@@ -339,13 +398,13 @@ func baseInsert(pojo interface{}, o orm.Ormer, autoId bool, excludeEmpty bool, e
 
 	tp := getParmaStruct(pojo)
 	if tp == "null" {
-		panic("Input is neither a slice nor a struct")
+		panic("Input is neither a struct")
 	}
 	if tp == "slice" {
 		panic("The pojo parameter cannot be of array type")
 	}
 
-	fields, values := getExcludeFiledName(pojo, tableName, excludeField, autoId, idFieldName, excludeEmpty)
+	fields, values, autoId := getExcludeFiledName(pojo, tableName, excludeField, idFieldName, excludeEmpty)
 	if len(fields) == 0 {
 		panic("No fields were found")
 	}
@@ -367,28 +426,36 @@ func baseInsert(pojo interface{}, o orm.Ormer, autoId bool, excludeEmpty bool, e
 	baseSQL := fmt.Sprintf("insert into %s %s values %s", tableName, str1, str2)
 	LogInfo("Insert", fmt.Sprintf("Preparing: %s", baseSQL))
 	LogInfo("Insert", fmt.Sprintf("Parameters: %v", values))
-	if o == nil {
-		o = orm.NewOrm()
+	var r orm.RawSeter
+
+	if !qw.txFlag || qw.txOrmer == nil {
+		if o == nil {
+			return 0
+		}
+		r = o.Raw(baseSQL, values...)
+	} else {
+		r = qw.txOrmer.Raw(baseSQL, values...)
 	}
-	if o == nil {
+	if r == nil {
+		logger.Error("RawSeter is null")
 		return 0
 	}
-	res, err := o.Raw(baseSQL, values...).Exec()
-	checkErr(err)
+	res, err := r.Exec()
 	if err != nil {
+		logger.Error("Insert failed: %v", err)
 		return 0
 	}
 	if autoId {
 		lastId, err1 := res.LastInsertId()
-		checkErr(err1)
 		if err1 != nil {
+			logger.Error("Get LastInsertId failed: %v", err1)
 			return 0
 		}
 		saveLastInsertId(pojo, lastId)
 	}
 	count, err := res.RowsAffected()
-	checkErr(err)
 	if err != nil {
+		logger.Error("Insert RowsAffected failed: %v", err)
 		return 0
 	}
 	return count
@@ -396,11 +463,15 @@ func baseInsert(pojo interface{}, o orm.Ormer, autoId bool, excludeEmpty bool, e
 
 func SelectCount4SQL(sql string, values ...interface{}) int64 {
 	var count int64
-	o := orm.NewOrm()
 	if o == nil {
 		return 0
 	}
-	err := o.Raw(sql, values...).QueryRow(&count)
+	r := o.Raw(sql, values...)
+	if r == nil {
+		logger.Error("RawSeter is null")
+		return 0
+	}
+	err := r.QueryRow(&count)
 	if err != nil {
 		return 0
 	}
@@ -409,16 +480,18 @@ func SelectCount4SQL(sql string, values ...interface{}) int64 {
 func SelectList4SQL(resList interface{}, sql string, values ...interface{}) error {
 	tp := getParmaStruct(resList)
 	if tp == "null" {
-		panic("Input is neither a slice nor a struct")
+		return errors.New("Input is neither a slice")
 	}
 	if tp != "Array" {
-		panic("The result set parameter must be of array type")
+		return errors.New("The result set parameter must be of array type")
 	}
-	o := orm.NewOrm()
 	if o == nil {
 		return errors.New("orm is nil")
 	}
 	r := o.Raw(sql, values...)
+	if r == nil {
+		return errors.New("RawSeter is null")
+	}
 	_, err := r.QueryRows(resList)
 	if err != nil {
 		return err
@@ -438,51 +511,36 @@ return:
 	返回值1: 影响的行数
 	返回值2: 插入后的自增主键值 , 受autoId参数影响
 */
-func Insert4SQL(autoId bool, sql string, values ...interface{}) (int64, int64) {
-	o := orm.NewOrm()
-	if o == nil {
-		return 0, 0
-	}
-	res, err := o.Raw(sql, values...).Exec()
-	checkErr(err)
-	if err != nil {
-		return 0, 0
-	}
-	count, err := res.RowsAffected()
-	checkErr(err)
-	if err != nil {
-		return 0, 0
-	}
-	if autoId {
-		lastId, err1 := res.LastInsertId()
-		checkErr(err1)
-		if err1 != nil {
+func (qw *UpdateWrapper) Insert4SQL(autoId bool, sql string, values ...interface{}) (int64, int64) {
+
+	var r orm.RawSeter
+
+	if !qw.txFlag || qw.txOrmer == nil {
+		if o == nil {
 			return 0, 0
 		}
-		return count, lastId
+		r = o.Raw(sql, values...)
+	} else {
+		r = qw.txOrmer.Raw(sql, values...)
 	}
-	return count, 0
-}
-
-func (qw *QueryWrapper) Insert4SQL(autoId bool, sql string, values ...interface{}) (int64, int64) {
-	o := qw.o
-	if o == nil {
+	if r == nil {
+		logger.Error("RawSeter is null")
 		return 0, 0
 	}
-	res, err := o.Raw(sql, values...).Exec()
-	checkErr(err)
+	res, err := r.Exec()
 	if err != nil {
+		logger.Error("Insert4SQL failed: %v", err)
 		return 0, 0
 	}
 	count, err := res.RowsAffected()
-	checkErr(err)
 	if err != nil {
+		logger.Error("Insert4SQL RowsAffected failed: %v", err)
 		return 0, 0
 	}
 	if autoId {
 		lastId, err1 := res.LastInsertId()
-		checkErr(err1)
 		if err1 != nil {
+			logger.Error("Get LastInsertId failed: %v", err1)
 			return 0, 0
 		}
 		return count, lastId
@@ -494,63 +552,44 @@ func (qw *QueryWrapper) Insert4SQL(autoId bool, sql string, values ...interface{
 原生sql的方式进行更新
 return:  影响的行数
 */
-func Update4SQL(sql string, values ...interface{}) int64 {
-	return exec4SQL(sql, nil, values...)
-}
-
-func (qw *QueryWrapper) Update4SQL(sql string, values ...interface{}) int64 {
-	return exec4SQL(sql, qw.o, values...)
+func (qw *UpdateWrapper) Update4SQL(sql string, values ...interface{}) int64 {
+	return qw.exec4SQL(sql, values...)
 }
 
 /*
 原生sql的方式进行删除
 return: 影响的行数
 */
-func Delete4SQL(sql string, values ...interface{}) int64 {
-	return exec4SQL(sql, nil, values...)
+func (qw *UpdateWrapper) Delete4SQL(sql string, values ...interface{}) int64 {
+	return qw.exec4SQL(sql, values...)
 }
 
-func (qw *QueryWrapper) Delete4SQL(sql string, values ...interface{}) int64 {
-	return exec4SQL(sql, qw.o, values...)
-}
+func (qw *UpdateWrapper) exec4SQL(sql string, values ...interface{}) int64 {
 
-func exec4SQL(sql string, o orm.Ormer, values ...interface{}) int64 {
-	if o == nil {
-		o = orm.NewOrm()
+	var r orm.RawSeter
+
+	if !qw.txFlag || qw.txOrmer == nil {
+		if o == nil {
+			return 0
+		}
+		r = o.Raw(sql, values...)
+	} else {
+		r = qw.txOrmer.Raw(sql, values...)
 	}
-	if o == nil {
+	if r == nil {
+		logger.Error("RawSeter is null")
 		return 0
 	}
-	res, err := o.Raw(sql, values...).Exec()
-	checkErr(err)
+
+	res, err := r.Exec()
 	if err != nil {
+		logger.Error("exec4SQL failed: %v", err)
 		return 0
 	}
 	count, err := res.RowsAffected()
-	checkErr(err)
 	if err != nil {
+		logger.Error("exec4SQL RowsAffected failed: %v", err)
 		return 0
 	}
 	return count
-}
-
-func (qw *QueryWrapper) BenginTransaction() error {
-	if qw.o == nil {
-		return errors.New("orm is nil")
-	}
-	return qw.o.Begin()
-}
-
-func (qw *QueryWrapper) Commit() error {
-	if qw.o == nil {
-		return errors.New("orm is nil")
-	}
-	return qw.o.Commit()
-}
-
-func (qw *QueryWrapper) Rollback() error {
-	if qw.o == nil {
-		return errors.New("orm is nil")
-	}
-	return qw.o.Rollback()
 }
