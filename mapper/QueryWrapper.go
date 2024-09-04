@@ -49,205 +49,205 @@ func BuilderQueryWrapper(list interface{}) QueryWrapper {
 	return qw
 }
 
-func (q *QueryWrapper) Eq(flag bool, column string, value interface{}) *QueryWrapper {
-	return addCondition(flag, column, value, q, "EQ")
+func (qw *QueryWrapper) Eq(flag bool, column string, value interface{}) *QueryWrapper {
+	return addCondition(flag, column, value, qw, "EQ")
 }
 
-func (q *QueryWrapper) Ne(flag bool, column string, value interface{}) *QueryWrapper {
-	return addCondition(flag, column, value, q, "NE")
+func (qw *QueryWrapper) Ne(flag bool, column string, value interface{}) *QueryWrapper {
+	return addCondition(flag, column, value, qw, "NE")
 }
 
-func (q *QueryWrapper) Gt(flag bool, column string, value interface{}) *QueryWrapper {
-	return addCondition(flag, column, value, q, "GT")
+func (qw *QueryWrapper) Gt(flag bool, column string, value interface{}) *QueryWrapper {
+	return addCondition(flag, column, value, qw, "GT")
 }
 
-func (q *QueryWrapper) Ge(flag bool, column string, value interface{}) *QueryWrapper {
-	return addCondition(flag, column, value, q, "GE")
+func (qw *QueryWrapper) Ge(flag bool, column string, value interface{}) *QueryWrapper {
+	return addCondition(flag, column, value, qw, "GE")
 }
 
-func (q *QueryWrapper) Lt(flag bool, column string, value interface{}) *QueryWrapper {
-	return addCondition(flag, column, value, q, "LT")
+func (qw *QueryWrapper) Lt(flag bool, column string, value interface{}) *QueryWrapper {
+	return addCondition(flag, column, value, qw, "LT")
 }
 
-func (q *QueryWrapper) Le(flag bool, column string, value interface{}) *QueryWrapper {
-	return addCondition(flag, column, value, q, "LE")
+func (qw *QueryWrapper) Le(flag bool, column string, value interface{}) *QueryWrapper {
+	return addCondition(flag, column, value, qw, "LE")
 }
-func (q *QueryWrapper) Like(flag bool, column string, value interface{}) *QueryWrapper {
+func (qw *QueryWrapper) Like(flag bool, column string, value interface{}) *QueryWrapper {
 	val := likeValue(value, "LIKE")
-	return addCondition(flag, column, val, q, "LIKE")
+	return addCondition(flag, column, val, qw, "LIKE")
 }
 
-func (q *QueryWrapper) LikeLeft(flag bool, column string, value interface{}) *QueryWrapper {
+func (qw *QueryWrapper) LikeLeft(flag bool, column string, value interface{}) *QueryWrapper {
 	val := likeValue(value, "LIKE_LEFT")
-	return addCondition(flag, column, val, q, "LIKE")
+	return addCondition(flag, column, val, qw, "LIKE")
 }
 
-func (q *QueryWrapper) LikeRight(flag bool, column string, value interface{}) *QueryWrapper {
+func (qw *QueryWrapper) LikeRight(flag bool, column string, value interface{}) *QueryWrapper {
 	val := likeValue(value, "LIKE_RIGHT")
-	return addCondition(flag, column, val, q, "LIKE")
+	return addCondition(flag, column, val, qw, "LIKE")
 }
 
-func (q *QueryWrapper) NotLike(flag bool, column string, value interface{}) *QueryWrapper {
-	return addCondition(flag, column, value, q, "NOT_LIKE")
+func (qw *QueryWrapper) NotLike(flag bool, column string, value interface{}) *QueryWrapper {
+	return addCondition(flag, column, value, qw, "NOT_LIKE")
 }
 
-func (q *QueryWrapper) IsNull(flag bool, column string) *QueryWrapper {
-	return addCondition(flag, column, "", q, "IS_NULL")
+func (qw *QueryWrapper) IsNull(flag bool, column string) *QueryWrapper {
+	return addCondition(flag, column, "", qw, "IS_NULL")
 }
 
-func (q *QueryWrapper) IsNotNull(flag bool, column string) *QueryWrapper {
-	return addCondition(flag, column, "", q, "IS_NOT_NULL")
+func (qw *QueryWrapper) IsNotNull(flag bool, column string) *QueryWrapper {
+	return addCondition(flag, column, "", qw, "IS_NOT_NULL")
 }
 
-func (q *QueryWrapper) In(flag bool, column string, values ...interface{}) *QueryWrapper {
+func (qw *QueryWrapper) In(flag bool, column string, values ...interface{}) *QueryWrapper {
 	checkParmas(values)
-	return addConditionVals(flag, column, values, q, "IN")
+	return addConditionVals(flag, column, values, qw, "IN")
 }
 
-func (q *QueryWrapper) InInt32(flag bool, column string, values []int32) *QueryWrapper {
+func (qw *QueryWrapper) InInt32(flag bool, column string, values []int32) *QueryWrapper {
 	var interfaces []interface{}
 	for _, s := range values {
 		interfaces = append(interfaces, s)
 	}
-	return addConditionVals(flag, column, interfaces, q, "IN")
+	return addConditionVals(flag, column, interfaces, qw, "IN")
 }
 
-func (q *QueryWrapper) InInt64(flag bool, column string, values []int64) *QueryWrapper {
+func (qw *QueryWrapper) InInt64(flag bool, column string, values []int64) *QueryWrapper {
 	var interfaces []interface{}
 	for _, s := range values {
 		interfaces = append(interfaces, s)
 	}
-	return addConditionVals(flag, column, interfaces, q, "IN")
+	return addConditionVals(flag, column, interfaces, qw, "IN")
 }
 
-func (q *QueryWrapper) InInt(flag bool, column string, values []int) *QueryWrapper {
+func (qw *QueryWrapper) InInt(flag bool, column string, values []int) *QueryWrapper {
 	var interfaces []interface{}
 	for _, s := range values {
 		interfaces = append(interfaces, s)
 	}
-	return addConditionVals(flag, column, interfaces, q, "IN")
+	return addConditionVals(flag, column, interfaces, qw, "IN")
 }
 
-func (q *QueryWrapper) InString(flag bool, column string, values []string) *QueryWrapper {
+func (qw *QueryWrapper) InString(flag bool, column string, values []string) *QueryWrapper {
 	var interfaces []interface{}
 	for _, s := range values {
 		interfaces = append(interfaces, s)
 	}
-	return addConditionVals(flag, column, interfaces, q, "IN")
+	return addConditionVals(flag, column, interfaces, qw, "IN")
 }
 
-func (q *QueryWrapper) InFloat32(flag bool, column string, values []float32) *QueryWrapper {
+func (qw *QueryWrapper) InFloat32(flag bool, column string, values []float32) *QueryWrapper {
 	var interfaces []interface{}
 	for _, s := range values {
 		interfaces = append(interfaces, s)
 	}
-	return addConditionVals(flag, column, interfaces, q, "IN")
+	return addConditionVals(flag, column, interfaces, qw, "IN")
 }
 
-func (q *QueryWrapper) InFloat64(flag bool, column string, values []float64) *QueryWrapper {
+func (qw *QueryWrapper) InFloat64(flag bool, column string, values []float64) *QueryWrapper {
 	var interfaces []interface{}
 	for _, s := range values {
 		interfaces = append(interfaces, s)
 	}
-	return addConditionVals(flag, column, interfaces, q, "IN")
+	return addConditionVals(flag, column, interfaces, qw, "IN")
 }
 
-func (q *QueryWrapper) NotIn(flag bool, column string, values ...interface{}) *QueryWrapper {
+func (qw *QueryWrapper) NotIn(flag bool, column string, values ...interface{}) *QueryWrapper {
 	checkParmas(values)
-	return addConditionVals(flag, column, values, q, "NOT_IN")
+	return addConditionVals(flag, column, values, qw, "NOT_IN")
 }
 
-func (q *QueryWrapper) NotInInt(flag bool, column string, values []int) *QueryWrapper {
+func (qw *QueryWrapper) NotInInt(flag bool, column string, values []int) *QueryWrapper {
 	var interfaces []interface{}
 	for _, s := range values {
 		interfaces = append(interfaces, s)
 	}
-	return addConditionVals(flag, column, interfaces, q, "NOT_IN")
+	return addConditionVals(flag, column, interfaces, qw, "NOT_IN")
 }
 
-func (q *QueryWrapper) NotInInt32(flag bool, column string, values []int32) *QueryWrapper {
+func (qw *QueryWrapper) NotInInt32(flag bool, column string, values []int32) *QueryWrapper {
 	var interfaces []interface{}
 	for _, s := range values {
 		interfaces = append(interfaces, s)
 	}
-	return addConditionVals(flag, column, interfaces, q, "NOT_IN")
+	return addConditionVals(flag, column, interfaces, qw, "NOT_IN")
 }
 
-func (q *QueryWrapper) NotInInt64(flag bool, column string, values []int64) *QueryWrapper {
+func (qw *QueryWrapper) NotInInt64(flag bool, column string, values []int64) *QueryWrapper {
 	var interfaces []interface{}
 	for _, s := range values {
 		interfaces = append(interfaces, s)
 	}
-	return addConditionVals(flag, column, interfaces, q, "NOT_IN")
+	return addConditionVals(flag, column, interfaces, qw, "NOT_IN")
 }
 
-func (q *QueryWrapper) NotInString(flag bool, column string, values []string) *QueryWrapper {
+func (qw *QueryWrapper) NotInString(flag bool, column string, values []string) *QueryWrapper {
 	var interfaces []interface{}
 	for _, s := range values {
 		interfaces = append(interfaces, s)
 	}
-	return addConditionVals(flag, column, interfaces, q, "NOT_IN")
+	return addConditionVals(flag, column, interfaces, qw, "NOT_IN")
 }
 
-func (q *QueryWrapper) NotInFloat32(flag bool, column string, values []float32) *QueryWrapper {
+func (qw *QueryWrapper) NotInFloat32(flag bool, column string, values []float32) *QueryWrapper {
 	var interfaces []interface{}
 	for _, s := range values {
 		interfaces = append(interfaces, s)
 	}
-	return addConditionVals(flag, column, interfaces, q, "NOT_IN")
+	return addConditionVals(flag, column, interfaces, qw, "NOT_IN")
 }
 
-func (q *QueryWrapper) NotInFloat64(flag bool, column string, values []float64) *QueryWrapper {
+func (qw *QueryWrapper) NotInFloat64(flag bool, column string, values []float64) *QueryWrapper {
 	var interfaces []interface{}
 	for _, s := range values {
 		interfaces = append(interfaces, s)
 	}
-	return addConditionVals(flag, column, interfaces, q, "NOT_IN")
+	return addConditionVals(flag, column, interfaces, qw, "NOT_IN")
 }
 
-func (q *QueryWrapper) Between(flag bool, column string, from string, to string) *QueryWrapper {
+func (qw *QueryWrapper) Between(flag bool, column string, from string, to string) *QueryWrapper {
 	values := []interface{}{from, to}
-	return addConditionVals(flag, column, values, q, "BETWEEN")
+	return addConditionVals(flag, column, values, qw, "BETWEEN")
 }
 
-func (q *QueryWrapper) OrderByTimeAsc(flag bool, column string) *QueryWrapper {
-	q.sorts = append(q.sorts, querySort{
+func (qw *QueryWrapper) OrderByTimeAsc(flag bool, column string) *QueryWrapper {
+	qw.sorts = append(qw.sorts, querySort{
 		condition: flag,
 		isAsc:     true,
 		columns:   changeTimeData(column),
 	})
-	return q
+	return qw
 }
 
-func (q *QueryWrapper) OrderByAsc(flag bool, column string) *QueryWrapper {
-	q.sorts = append(q.sorts, querySort{
+func (qw *QueryWrapper) OrderByAsc(flag bool, column string) *QueryWrapper {
+	qw.sorts = append(qw.sorts, querySort{
 		condition: flag,
 		isAsc:     true,
 		columns:   column,
 	})
-	return q
+	return qw
 }
 
-func (q *QueryWrapper) OrderByTimeDesc(flag bool, column string) *QueryWrapper {
-	q.sorts = append(q.sorts, querySort{
+func (qw *QueryWrapper) OrderByTimeDesc(flag bool, column string) *QueryWrapper {
+	qw.sorts = append(qw.sorts, querySort{
 		condition: flag,
 		isAsc:     false,
 		columns:   changeTimeData(column),
 	})
-	return q
+	return qw
 }
-func (q *QueryWrapper) OrderByDesc(flag bool, column string) *QueryWrapper {
-	q.sorts = append(q.sorts, querySort{
+func (qw *QueryWrapper) OrderByDesc(flag bool, column string) *QueryWrapper {
+	qw.sorts = append(qw.sorts, querySort{
 		condition: flag,
 		isAsc:     false,
 		columns:   column,
 	})
-	return q
+	return qw
 }
 
-func (q *QueryWrapper) LastSql(sql string) *QueryWrapper {
-	q.lastSQL = sql
-	return q
+func (qw *QueryWrapper) LastSql(sql string) *QueryWrapper {
+	qw.lastSQL = sql
+	return qw
 }
 
 func addCondition(flag bool, column string, value interface{}, q *QueryWrapper, sqlKeyword string) *QueryWrapper {

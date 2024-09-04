@@ -31,220 +31,220 @@ func BuilderUpdateWrapper(obj interface{}, flag bool) UpdateWrapper {
 	return wrapper
 }
 
-func (q *UpdateWrapper) GetTransaction() orm.TxOrmer {
-	if q.txFlag {
-		return q.txOrmer
+func (qw *UpdateWrapper) GetTransaction() orm.TxOrmer {
+	if qw.txFlag {
+		return qw.txOrmer
 	}
 	return nil
 }
 
-func (q *UpdateWrapper) BenginTransaction() error {
-	if q.txFlag {
-		if q.txOrmer != nil {
+func (qw *UpdateWrapper) BenginTransaction() error {
+	if qw.txFlag {
+		if qw.txOrmer != nil {
 			return nil
 		}
 	}
-	q.txFlag = true
+	qw.txFlag = true
 	txOrmer, err := GetOrm().Begin()
 	if err != nil {
-		q.txFlag = false
+		qw.txFlag = false
 		logger.Error("Transaction initiation failed: %v", err)
 		return err
 	}
-	q.txOrmer = txOrmer
+	qw.txOrmer = txOrmer
 	return nil
 }
 
-func (q *UpdateWrapper) Commit() error {
-	if !q.txFlag {
+func (qw *UpdateWrapper) Commit() error {
+	if !qw.txFlag {
 		return errors.New("Transaction not enabled")
 	}
-	if q.txOrmer == nil {
+	if qw.txOrmer == nil {
 		return errors.New("orm is nil")
 	}
-	return q.txOrmer.Commit()
+	return qw.txOrmer.Commit()
 }
 
-func (q *UpdateWrapper) Rollback() error {
-	if !q.txFlag {
+func (qw *UpdateWrapper) Rollback() error {
+	if !qw.txFlag {
 		return errors.New("Transaction not enabled")
 	}
-	if q.txOrmer == nil {
+	if qw.txOrmer == nil {
 		return errors.New("orm is nil")
 	}
-	return q.txOrmer.Rollback()
+	return qw.txOrmer.Rollback()
 }
 
-func (q *UpdateWrapper) Set(flag bool, column string, value interface{}) *UpdateWrapper {
+func (qw *UpdateWrapper) Set(flag bool, column string, value interface{}) *UpdateWrapper {
 	checkParma(value)
-	q.updates = append(q.updates, updateSet{condition: flag, columns: column, values: value})
-	return q
+	qw.updates = append(qw.updates, updateSet{condition: flag, columns: column, values: value})
+	return qw
 }
 
-func (q *UpdateWrapper) Eq(flag bool, column string, value interface{}) *UpdateWrapper {
-	return addCondition4Update(flag, column, value, q, "EQ")
+func (qw *UpdateWrapper) Eq(flag bool, column string, value interface{}) *UpdateWrapper {
+	return addCondition4Update(flag, column, value, qw, "EQ")
 }
 
-func (q *UpdateWrapper) Ne(flag bool, column string, value interface{}) *UpdateWrapper {
-	return addCondition4Update(flag, column, value, q, "NE")
+func (qw *UpdateWrapper) Ne(flag bool, column string, value interface{}) *UpdateWrapper {
+	return addCondition4Update(flag, column, value, qw, "NE")
 }
 
-func (q *UpdateWrapper) Gt(flag bool, column string, value interface{}) *UpdateWrapper {
-	return addCondition4Update(flag, column, value, q, "GT")
+func (qw *UpdateWrapper) Gt(flag bool, column string, value interface{}) *UpdateWrapper {
+	return addCondition4Update(flag, column, value, qw, "GT")
 }
 
-func (q *UpdateWrapper) Ge(flag bool, column string, value interface{}) *UpdateWrapper {
-	return addCondition4Update(flag, column, value, q, "GE")
+func (qw *UpdateWrapper) Ge(flag bool, column string, value interface{}) *UpdateWrapper {
+	return addCondition4Update(flag, column, value, qw, "GE")
 }
 
-func (q *UpdateWrapper) Lt(flag bool, column string, value interface{}) *UpdateWrapper {
-	return addCondition4Update(flag, column, value, q, "LT")
+func (qw *UpdateWrapper) Lt(flag bool, column string, value interface{}) *UpdateWrapper {
+	return addCondition4Update(flag, column, value, qw, "LT")
 }
 
-func (q *UpdateWrapper) Le(flag bool, column string, value interface{}) *UpdateWrapper {
-	return addCondition4Update(flag, column, value, q, "LE")
+func (qw *UpdateWrapper) Le(flag bool, column string, value interface{}) *UpdateWrapper {
+	return addCondition4Update(flag, column, value, qw, "LE")
 }
-func (q *UpdateWrapper) Like(flag bool, column string, value interface{}) *UpdateWrapper {
+func (qw *UpdateWrapper) Like(flag bool, column string, value interface{}) *UpdateWrapper {
 	val := likeValue(value, "LIKE")
-	return addCondition4Update(flag, column, val, q, "LIKE")
+	return addCondition4Update(flag, column, val, qw, "LIKE")
 }
 
-func (q *UpdateWrapper) LikeLeft(flag bool, column string, value interface{}) *UpdateWrapper {
+func (qw *UpdateWrapper) LikeLeft(flag bool, column string, value interface{}) *UpdateWrapper {
 	val := likeValue(value, "LIKE_LEFT")
-	return addCondition4Update(flag, column, val, q, "LIKE")
+	return addCondition4Update(flag, column, val, qw, "LIKE")
 }
 
-func (q *UpdateWrapper) LikeRight(flag bool, column string, value interface{}) *UpdateWrapper {
+func (qw *UpdateWrapper) LikeRight(flag bool, column string, value interface{}) *UpdateWrapper {
 	val := likeValue(value, "LIKE_RIGHT")
-	return addCondition4Update(flag, column, val, q, "LIKE")
+	return addCondition4Update(flag, column, val, qw, "LIKE")
 }
 
-func (q *UpdateWrapper) NotLike(flag bool, column string, value interface{}) *UpdateWrapper {
-	return addCondition4Update(flag, column, value, q, "NOT_LIKE")
+func (qw *UpdateWrapper) NotLike(flag bool, column string, value interface{}) *UpdateWrapper {
+	return addCondition4Update(flag, column, value, qw, "NOT_LIKE")
 }
 
-func (q *UpdateWrapper) IsNull(flag bool, column string) *UpdateWrapper {
-	return addCondition4Update(flag, column, "", q, "IS_NULL")
+func (qw *UpdateWrapper) IsNull(flag bool, column string) *UpdateWrapper {
+	return addCondition4Update(flag, column, "", qw, "IS_NULL")
 }
 
-func (q *UpdateWrapper) IsNotNull(flag bool, column string) *UpdateWrapper {
-	return addCondition4Update(flag, column, "", q, "IS_NOT_NULL")
+func (qw *UpdateWrapper) IsNotNull(flag bool, column string) *UpdateWrapper {
+	return addCondition4Update(flag, column, "", qw, "IS_NOT_NULL")
 }
 
-func (q *UpdateWrapper) In(flag bool, column string, values ...interface{}) *UpdateWrapper {
+func (qw *UpdateWrapper) In(flag bool, column string, values ...interface{}) *UpdateWrapper {
 	checkParmas(values)
-	return addConditionVals4Update(flag, column, values, q, "IN")
+	return addConditionVals4Update(flag, column, values, qw, "IN")
 }
 
-func (q *UpdateWrapper) InInt32(flag bool, column string, values []int32) *UpdateWrapper {
+func (qw *UpdateWrapper) InInt32(flag bool, column string, values []int32) *UpdateWrapper {
 	var interfaces []interface{}
 	for _, s := range values {
 		interfaces = append(interfaces, s)
 	}
-	return addConditionVals4Update(flag, column, interfaces, q, "IN")
+	return addConditionVals4Update(flag, column, interfaces, qw, "IN")
 }
 
-func (q *UpdateWrapper) InInt64(flag bool, column string, values []int64) *UpdateWrapper {
+func (qw *UpdateWrapper) InInt64(flag bool, column string, values []int64) *UpdateWrapper {
 	var interfaces []interface{}
 	for _, s := range values {
 		interfaces = append(interfaces, s)
 	}
-	return addConditionVals4Update(flag, column, interfaces, q, "IN")
+	return addConditionVals4Update(flag, column, interfaces, qw, "IN")
 }
 
-func (q *UpdateWrapper) InInt(flag bool, column string, values []int) *UpdateWrapper {
+func (qw *UpdateWrapper) InInt(flag bool, column string, values []int) *UpdateWrapper {
 	var interfaces []interface{}
 	for _, s := range values {
 		interfaces = append(interfaces, s)
 	}
-	return addConditionVals4Update(flag, column, interfaces, q, "IN")
+	return addConditionVals4Update(flag, column, interfaces, qw, "IN")
 }
 
-func (q *UpdateWrapper) InString(flag bool, column string, values []string) *UpdateWrapper {
+func (qw *UpdateWrapper) InString(flag bool, column string, values []string) *UpdateWrapper {
 	var interfaces []interface{}
 	for _, s := range values {
 		interfaces = append(interfaces, s)
 	}
-	return addConditionVals4Update(flag, column, interfaces, q, "IN")
+	return addConditionVals4Update(flag, column, interfaces, qw, "IN")
 }
 
-func (q *UpdateWrapper) InFloat32(flag bool, column string, values []float32) *UpdateWrapper {
+func (qw *UpdateWrapper) InFloat32(flag bool, column string, values []float32) *UpdateWrapper {
 	var interfaces []interface{}
 	for _, s := range values {
 		interfaces = append(interfaces, s)
 	}
-	return addConditionVals4Update(flag, column, interfaces, q, "IN")
+	return addConditionVals4Update(flag, column, interfaces, qw, "IN")
 }
 
-func (q *UpdateWrapper) InFloat64(flag bool, column string, values []float64) *UpdateWrapper {
+func (qw *UpdateWrapper) InFloat64(flag bool, column string, values []float64) *UpdateWrapper {
 	var interfaces []interface{}
 	for _, s := range values {
 		interfaces = append(interfaces, s)
 	}
-	return addConditionVals4Update(flag, column, interfaces, q, "IN")
+	return addConditionVals4Update(flag, column, interfaces, qw, "IN")
 }
 
-func (q *UpdateWrapper) NotIn(flag bool, column string, values ...interface{}) *UpdateWrapper {
+func (qw *UpdateWrapper) NotIn(flag bool, column string, values ...interface{}) *UpdateWrapper {
 	checkParmas(values)
-	return addConditionVals4Update(flag, column, values, q, "NOT_IN")
+	return addConditionVals4Update(flag, column, values, qw, "NOT_IN")
 }
 
-func (q *UpdateWrapper) NotInInt(flag bool, column string, values []int) *UpdateWrapper {
+func (qw *UpdateWrapper) NotInInt(flag bool, column string, values []int) *UpdateWrapper {
 	var interfaces []interface{}
 	for _, s := range values {
 		interfaces = append(interfaces, s)
 	}
-	return addConditionVals4Update(flag, column, interfaces, q, "NOT_IN")
+	return addConditionVals4Update(flag, column, interfaces, qw, "NOT_IN")
 }
 
-func (q *UpdateWrapper) NotInInt32(flag bool, column string, values []int32) *UpdateWrapper {
+func (qw *UpdateWrapper) NotInInt32(flag bool, column string, values []int32) *UpdateWrapper {
 	var interfaces []interface{}
 	for _, s := range values {
 		interfaces = append(interfaces, s)
 	}
-	return addConditionVals4Update(flag, column, interfaces, q, "NOT_IN")
+	return addConditionVals4Update(flag, column, interfaces, qw, "NOT_IN")
 }
 
-func (q *UpdateWrapper) NotInInt64(flag bool, column string, values []int64) *UpdateWrapper {
+func (qw *UpdateWrapper) NotInInt64(flag bool, column string, values []int64) *UpdateWrapper {
 	var interfaces []interface{}
 	for _, s := range values {
 		interfaces = append(interfaces, s)
 	}
-	return addConditionVals4Update(flag, column, interfaces, q, "NOT_IN")
+	return addConditionVals4Update(flag, column, interfaces, qw, "NOT_IN")
 }
 
-func (q *UpdateWrapper) NotInString(flag bool, column string, values []string) *UpdateWrapper {
+func (qw *UpdateWrapper) NotInString(flag bool, column string, values []string) *UpdateWrapper {
 	var interfaces []interface{}
 	for _, s := range values {
 		interfaces = append(interfaces, s)
 	}
-	return addConditionVals4Update(flag, column, interfaces, q, "NOT_IN")
+	return addConditionVals4Update(flag, column, interfaces, qw, "NOT_IN")
 }
 
-func (q *UpdateWrapper) NotInFloat32(flag bool, column string, values []float32) *UpdateWrapper {
+func (qw *UpdateWrapper) NotInFloat32(flag bool, column string, values []float32) *UpdateWrapper {
 	var interfaces []interface{}
 	for _, s := range values {
 		interfaces = append(interfaces, s)
 	}
-	return addConditionVals4Update(flag, column, interfaces, q, "NOT_IN")
+	return addConditionVals4Update(flag, column, interfaces, qw, "NOT_IN")
 }
 
-func (q *UpdateWrapper) NotInFloat64(flag bool, column string, values []float64) *UpdateWrapper {
+func (qw *UpdateWrapper) NotInFloat64(flag bool, column string, values []float64) *UpdateWrapper {
 	var interfaces []interface{}
 	for _, s := range values {
 		interfaces = append(interfaces, s)
 	}
-	return addConditionVals4Update(flag, column, interfaces, q, "NOT_IN")
+	return addConditionVals4Update(flag, column, interfaces, qw, "NOT_IN")
 }
 
-func (q *UpdateWrapper) Between(flag bool, column string, from string, to string) *UpdateWrapper {
+func (qw *UpdateWrapper) Between(flag bool, column string, from string, to string) *UpdateWrapper {
 	values := []interface{}{from, to}
-	return addConditionVals4Update(flag, column, values, q, "BETWEEN")
+	return addConditionVals4Update(flag, column, values, qw, "BETWEEN")
 }
 
-func (q *UpdateWrapper) LastSql(sql string) *UpdateWrapper {
-	q.lastSQL = sql
-	return q
+func (qw *UpdateWrapper) LastSql(sql string) *UpdateWrapper {
+	qw.lastSQL = sql
+	return qw
 }
 
 func addCondition4Update(flag bool, column string, value interface{}, q *UpdateWrapper, sqlKeyword string) *UpdateWrapper {
