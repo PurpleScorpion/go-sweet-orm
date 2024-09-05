@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"github.com/PurpleScorpion/go-sweet-orm/logger"
 	"github.com/beego/beego/v2/client/orm"
+	_ "github.com/go-sql-driver/mysql"
+	_ "github.com/mattn/go-sqlite3"
 	"reflect"
 	"strings"
 )
@@ -14,27 +16,73 @@ type MapperUtils struct {
 var (
 	tableIds        []tableCacheVO
 	tableNames      []tableCacheVO
-	fieldNames      []fieldCacheVO
-	fieldTableNames []fieldCacheVO
+	fieldNames      []fieldCacheVO // 驼峰字段名称
+	fieldTableNames []fieldCacheVO // 数据库原始字段名称, 带下划线的
 	MySQL           = "mysql"
 	Sqlite          = "sqlite3"
-	ActiveDB        = ""
-	ActiveLog       = false
+	active_db       = ""
+	active_log      = false
 	o               orm.Ormer
+	dataSource      string
+	params1         = 50
+	params2         = 100
+	dbActiveFlag    = false
+	transaction     = false // 全局事务
 )
 
-func InitMapper(activeDB string, activeLog bool) {
+func Register(activeDB, connStr string, params ...int) {
+	if dbActiveFlag {
+		panic("Database is already registered")
+	}
+
 	if isEmpty(activeDB) {
 		panic("ActiveDB is empty")
 	}
 	if activeDB != MySQL && activeDB != Sqlite {
 		panic(activeDB + " is not support")
 	}
-	ActiveDB = activeDB
-	ActiveLog = activeLog
+	if isEmpty(connStr) {
+		panic("Connection string is empty")
+	}
+	active_db = activeDB
+	dataSource = connStr
+	for i, v := range params {
+		switch i {
+		case 0:
+			params1 = v
+			break
+		case 1:
+			params2 = v
+			break
+		}
+	}
+
+	if activeDB == MySQL {
+		orm.RegisterDriver("mysql", orm.DRMySQL)
+		orm.RegisterDataBase("default", "mysql", dataSource)
+	} else {
+		orm.RegisterDriver("sqlite3", orm.DRSqlite)
+		orm.RegisterDataBase("default", "sqlite3", dataSource)
+	}
+
+	orm.SetMaxIdleConns("default", params1)
+	orm.SetMaxOpenConns("default", params2)
+
 	o = orm.NewOrm()
+	dbActiveFlag = true
 }
 
+// 开启全局事务 这样的话 BuilderUpdateWrapper 函数就不需要填写第二个参数了
+// 如果你填了 BuilderUpdateWrapper 的第二个参数 , 那将以你填的为准
+func OpenTransaction() {
+	transaction = true
+}
+
+func OpenLog() {
+	active_log = true
+}
+
+// 建议使用该函数去获取ORM 而不是通过NewOrm的方式
 func GetOrm() orm.Ormer {
 	return o
 }
@@ -164,17 +212,18 @@ func getSqlKeyword(sqlKeyword string) string {
 }
 
 func getTableId(T any) string {
-	v := reflect.ValueOf(T)
-
+	v := reflect.Indirect(reflect.ValueOf(T))
 	//加入缓存 , 速度更快
 	tp := v.Type().String()
 	idFieldName := getCacheTableId(tp)
 	if idFieldName != "null" {
 		return idFieldName
 	}
-	v = v.Elem()
 	switch v.Kind() {
 	case reflect.Slice:
+		if v.Len() == 0 {
+			return "null"
+		}
 		return getTableId4Array(T, tp)
 	case reflect.Struct:
 		return getTableId4Object(T, tp)
@@ -185,8 +234,7 @@ func getTableId(T any) string {
 }
 
 func getParmaStruct(T any) string {
-	v := reflect.ValueOf(T)
-	v = v.Elem()
+	v := reflect.Indirect(reflect.ValueOf(T))
 	switch v.Kind() {
 	case reflect.Slice:
 		return "Array"
@@ -199,7 +247,7 @@ func getParmaStruct(T any) string {
 }
 
 func getTableId4Object(T any, typeName string) string {
-	ref := reflect.ValueOf(T).Elem().Type()
+	ref := reflect.Indirect(reflect.ValueOf(T)).Type()
 
 	for i := 0; i < ref.NumField(); i++ {
 		// 获取每个成员的结构体字段类型
@@ -340,24 +388,24 @@ func getAllFiledName(T any, tableName string) ([]string, []interface{}) {
 
 	if fn == nil {
 		names := make([]string, 0)
-		tableNames := make([]string, 0)
-		ref := reflect.ValueOf(T).Elem().Type()
+		filedNameList := make([]string, 0)
+		ref := reflect.Indirect(reflect.ValueOf(T)).Type()
 		for i := 0; i < ref.NumField(); i++ {
 			field := ref.Field(i)
 			//驼峰转下划线方式
 			name := camelToUnderscore(field.Name)
-			// 原始字段名称
+			// 驼峰字段名称
 			names = append(names, field.Name)
 			// 转成数据库格式的字段名称 (带下划线的)
-			tableNames = append(tableNames, name)
+			filedNameList = append(filedNameList, name)
 		}
 		fieldNames = append(fieldNames, fieldCacheVO{Name: tableName, Fields: names})
-		fieldTableNames = append(fieldTableNames, fieldCacheVO{Name: tableName, Fields: tableNames})
+		fieldTableNames = append(fieldTableNames, fieldCacheVO{Name: tableName, Fields: filedNameList})
 		fn = names
-		ftn = tableNames
+		ftn = filedNameList
 	}
 	values := make([]interface{}, 0)
-	obj := reflect.ValueOf(T).Elem()
+	obj := reflect.Indirect(reflect.ValueOf(T))
 
 	for i := 0; i < len(fn); i++ {
 		val := obj.FieldByName(fn[i]).Interface()
@@ -369,9 +417,9 @@ func getAllFiledName(T any, tableName string) ([]string, []interface{}) {
 // 从缓存中取原始格式的字段名
 func getCatchFieldNames(tableName string) []string {
 	if fieldNames != nil && len(fieldNames) > 0 {
-		for _, fieldCacheVO := range fieldNames {
-			if fieldCacheVO.Name == tableName {
-				return fieldCacheVO.Fields
+		for _, vo := range fieldNames {
+			if vo.Name == tableName {
+				return vo.Fields
 			}
 		}
 	}
@@ -381,9 +429,9 @@ func getCatchFieldNames(tableName string) []string {
 // 从缓存中取数据库格式的字段名
 func getCatchFieldTableNames(tableName string) []string {
 	if fieldTableNames != nil && len(fieldTableNames) > 0 {
-		for _, fieldCacheVO := range fieldTableNames {
-			if fieldCacheVO.Name == tableName {
-				return fieldCacheVO.Fields
+		for _, vo := range fieldTableNames {
+			if vo.Name == tableName {
+				return vo.Fields
 			}
 		}
 	}
@@ -391,13 +439,8 @@ func getCatchFieldTableNames(tableName string) []string {
 }
 
 func getTableId4Array(T any, typeName string) string {
-	v := reflect.ValueOf(T)
-	v = v.Elem()
-	elemType := v.Type().Elem()
-
-	if elemType.Kind() == reflect.Ptr {
-		elemType = elemType.Elem()
-	}
+	v := reflect.Indirect(reflect.ValueOf(T))
+	elemType := reflect.Indirect(v.Index(0)).Type()
 	for i := 0; i < elemType.NumField(); i++ {
 		// 获取每个成员的结构体字段类型
 		fieldType := elemType.Field(i)
@@ -437,15 +480,11 @@ func getTableName(T interface{}) string {
 		addTableCache(typeName, tbName, "basedao-tableNames")
 		return tbName
 	} else {
-		v := reflect.ValueOf(T)
-		elemType := v.Elem().Type()
-
-		elemType = elemType.Elem()
-		// elemType := v.Type().Elem()
-
-		// if elemType.Kind() == reflect.Ptr {
-		// 	elemType = elemType.Elem()
-		// }
+		v := reflect.Indirect(reflect.ValueOf(T))
+		elemType := v.Type().Elem()
+		if elemType.Kind() == reflect.Ptr {
+			elemType = elemType.Elem()
+		}
 		obj := reflect.New(elemType).Elem().Interface()
 		funcVal := reflect.ValueOf(obj).MethodByName(funcName)
 		// methodValue, _ := elemType.MethodByName(funcName)
@@ -627,7 +666,14 @@ func saveLastInsertId(T interface{}, lastId int64) {
 }
 
 func LogInfo(methodName string, format string) {
-	if ActiveLog {
+	if active_log {
 		logger.Info("[%s]: ==> %s", methodName, format)
 	}
+}
+
+func isSlice(obj interface{}) bool {
+	value := reflect.ValueOf(obj)
+	kind := value.Kind()
+
+	return kind == reflect.Slice
 }

@@ -390,7 +390,7 @@ func float64ToString(floatValue float64) string {
 }
 
 func changeTimeData(val string) string {
-	if ActiveDB == Sqlite {
+	if active_db == Sqlite {
 		val = fmt.Sprintf("datetime(%s)", val)
 		return val
 	}

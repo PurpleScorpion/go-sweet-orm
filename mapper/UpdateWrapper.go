@@ -15,10 +15,19 @@ type UpdateWrapper struct {
 	txFlag  bool
 }
 
-func BuilderUpdateWrapper(obj interface{}, flag bool) UpdateWrapper {
+func BuilderUpdateWrapper(obj interface{}, flag ...bool) UpdateWrapper {
 	var wrapper UpdateWrapper
-	wrapper.txFlag = flag
-	if flag {
+	if len(flag) == 0 {
+		if !transaction {
+			wrapper.txFlag = false
+		} else {
+			wrapper.txFlag = true
+		}
+	} else {
+		wrapper.txFlag = flag[0]
+	}
+
+	if wrapper.txFlag {
 		txOrmer, err := GetOrm().Begin()
 		if err != nil {
 			logger.Error("Transaction initiation failed: %v", err)
@@ -31,6 +40,29 @@ func BuilderUpdateWrapper(obj interface{}, flag bool) UpdateWrapper {
 	return wrapper
 }
 
+// 传播事务 , 可以将一个UpdateWrapper的事务传递到下一个UpdateWrapper中,并可以无限传播
+// 若想手动传播可使用 SetTransaction 函数
+func (qw *UpdateWrapper) SpreadTransaction(other UpdateWrapper) *UpdateWrapper {
+	if !other.txFlag || other.txOrmer == nil {
+		logger.Error("There are no transactions that can be disseminated")
+	}
+	qw.txFlag = true
+	qw.txOrmer = other.txOrmer
+	return qw
+}
+
+// 设置事务
+func (qw *UpdateWrapper) SetTransaction(tx orm.TxOrmer) *UpdateWrapper {
+	if tx == nil {
+		logger.Error("The transaction parameter cannot be empty")
+		return qw
+	}
+	qw.txFlag = true
+	qw.txOrmer = tx
+	return qw
+}
+
+// 获取事务
 func (qw *UpdateWrapper) GetTransaction() orm.TxOrmer {
 	if qw.txFlag {
 		return qw.txOrmer
@@ -38,6 +70,7 @@ func (qw *UpdateWrapper) GetTransaction() orm.TxOrmer {
 	return nil
 }
 
+// 手动开启事务
 func (qw *UpdateWrapper) BenginTransaction() error {
 	if qw.txFlag {
 		if qw.txOrmer != nil {
@@ -55,6 +88,7 @@ func (qw *UpdateWrapper) BenginTransaction() error {
 	return nil
 }
 
+// 手动提交事务
 func (qw *UpdateWrapper) Commit() error {
 	if !qw.txFlag {
 		return errors.New("Transaction not enabled")
@@ -65,6 +99,7 @@ func (qw *UpdateWrapper) Commit() error {
 	return qw.txOrmer.Commit()
 }
 
+// 手动回滚事务
 func (qw *UpdateWrapper) Rollback() error {
 	if !qw.txFlag {
 		return errors.New("Transaction not enabled")
