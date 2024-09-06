@@ -1,4 +1,4 @@
-module github.com/PurpleScorpion/go-sweet-orm
+module github.com/PurpleScorpion/go-sweet-orm/v2
 
 go 1.20
 
