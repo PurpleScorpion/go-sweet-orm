@@ -670,7 +670,7 @@ func baseInsert(pojo interface{}, excludeEmpty bool, qw *UpdateWrapper, excludeF
 	LogInfo("Insert", fmt.Sprintf("Parameters: %v", values))
 	var r orm.RawSeter
 
-	if !qw.txFlag || qw.txOrmer == nil {
+	if qw == nil || !qw.txFlag || qw.txOrmer == nil {
 		if o == nil {
 			return 0
 		}
