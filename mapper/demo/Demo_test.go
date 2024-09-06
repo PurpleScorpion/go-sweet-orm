@@ -9,16 +9,19 @@ import (
 )
 
 func TestDemo2(t *testing.T) {
-
+	var list []Logs
 	fmt.Println(getTableId(&Logs{}))
 	fmt.Println(getTableId(Logs{}))
 	fmt.Println(getTableId(getLogList()))
 	fmt.Println(getTableId(getLogListNoPoint()))
+	fmt.Println(getTableId(&list))
 	fmt.Println("-------------------------------------")
 	fmt.Println(getTableName(getLogList()))
 	fmt.Println(getTableName(getLogListNoPoint()))
 	fmt.Println(getTableName(&Logs{}))
 	fmt.Println(getTableName(Logs{}))
+
+	fmt.Println(getTableName(&list))
 }
 func TestDemo1(t *testing.T) {
 

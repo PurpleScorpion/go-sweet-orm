@@ -221,9 +221,6 @@ func getTableId(T any) string {
 	}
 	switch v.Kind() {
 	case reflect.Slice:
-		if v.Len() == 0 {
-			return "null"
-		}
 		return getTableId4Array(T, tp)
 	case reflect.Struct:
 		return getTableId4Object(T, tp)
