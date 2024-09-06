@@ -9,12 +9,12 @@
 
  - 1 引入包 
    ```text
-    go get github.com/PurpleScorpion/go-sweet-orm
+    go get github.com/PurpleScorpion/go-sweet-orm/v2@latest
     
    ```
    ```text
     使用以下语句来引入包
-    import "github.com/PurpleScorpion/go-sweet-orm/mapper"
+    import "github.com/PurpleScorpion/go-sweet-orm/v2/mapper"
    ```
  - 2 注册数据库连接
      ```text

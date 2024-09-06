@@ -3,7 +3,7 @@ package mapperDemo
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/PurpleScorpion/go-sweet-orm/mapper"
+	"github.com/PurpleScorpion/go-sweet-orm/v2/mapper"
 )
 
 // import (

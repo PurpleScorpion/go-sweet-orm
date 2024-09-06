@@ -2,7 +2,7 @@ package mapperDemo
 
 import (
 	"fmt"
-	"github.com/PurpleScorpion/go-sweet-orm/mapper"
+	"github.com/PurpleScorpion/go-sweet-orm/v2/mapper"
 	"reflect"
 	"strings"
 	"testing"
