@@ -53,9 +53,6 @@ func getTableId(T any) string {
 
 	switch v.Kind() {
 	case reflect.Slice:
-		if v.Len() == 0 {
-			return "null"
-		}
 		return getTableId4Array(T, tp)
 	case reflect.Struct:
 		return getTableId4Object(T, tp)
@@ -67,7 +64,11 @@ func getTableId(T any) string {
 
 func getTableId4Array(T any, typeName string) string {
 	v := reflect.Indirect(reflect.ValueOf(T))
-	elemType := reflect.Indirect(v.Index(0)).Type()
+	elemType := v.Type().Elem()
+
+	if elemType.Kind() == reflect.Ptr {
+		elemType = elemType.Elem()
+	}
 	for i := 0; i < elemType.NumField(); i++ {
 		// 获取每个成员的结构体字段类型
 		fieldType := elemType.Field(i)
