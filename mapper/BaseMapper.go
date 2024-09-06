@@ -617,6 +617,11 @@ func Insert(pojo interface{}, excludeField ...string) int64 {
 	return baseInsert(pojo, true, nil, excludeField...)
 }
 
+// 默认 自增主键和空值排除的新增
+func InsertCustom(pojo interface{}, excludeEmpty bool, excludeField ...string) int64 {
+	return baseInsert(pojo, excludeEmpty, nil, excludeField...)
+}
+
 func (qw *UpdateWrapper) InsertCustom(excludeEmpty bool, excludeField ...string) int64 {
 	return baseInsert(qw.object, excludeEmpty, qw, excludeField...)
 }
