@@ -220,6 +220,14 @@ func delById(obj interface{}, id interface{}, o orm.Ormer) int64 {
 }
 
 func Update(qw QueryWrapper) int64 {
+	return baseUpdate(qw)
+}
+
+func (qw *QueryWrapper) Update() int64 {
+	return baseUpdate(*qw)
+}
+
+func baseUpdate(qw QueryWrapper) int64 {
 	resList := qw.resList
 	tp := getParmaStruct(resList)
 	if tp == "null" {
