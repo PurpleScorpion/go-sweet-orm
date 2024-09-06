@@ -1,6 +1,6 @@
 # go-sweet-orm
 
-## go的持久层框架
+## go的持久层框架 V2
 
 ### 基础支持
  - beego框架作为基础框架  (github.com/beego/beego/v2 v2.2.1)
@@ -15,15 +15,70 @@
    ```text
     使用以下语句来引入包
     import "github.com/PurpleScorpion/go-sweet-orm/mapper"
-    使用以下函数注册驱动 , 注意 需要先在beego中完成数据库注册
-    mapper.InitMapper(mapper.Sqlite, true)
-    参数一: 
-    mapper.Sqlite代表注册驱动为sqlite3
-    mapper.MySQL代表注册驱动为mysql
-    参数二:
-    第二个参数为是否开启sql展示 true:开启/false:不开启
    ```
- - 2 包含的函数(自动事务)
+ - 2 注册数据库连接
+     ```text
+     mapper.Register(activeDB, connStr string, params ...int)  
+         activeDB: 激活的数据库, 目前仅支持 mapper.MySQL 和 mapper.Sqlite
+         connStr: 数据库连接字符串 (注意mysql是包含用户名密码的连接字符串, 但是Sqlite却是文件地址)
+             mysql连接字符串: connStr := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8&parseTime=true&loc=Local", username, password, host, port, dbName) 
+         params: 可变参数, 但是目前仅前两个参数有效 , 可选项, 第一个为MaxIdleConns(默认50) , 第二个为MaxOpenConns(默认100) 
+       
+     使用示例:
+       connStr := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8&parseTime=true&loc=Local", username, password, host, port, dbName) 
+       mapper.Register(mapper.MySQL, connStr)
+     ```
+ - 3 Wrapper介绍
+   - 3.1 QueryWrapper
+   ```text
+    1. 创建查询器 
+    var log []Logs
+    qw := mapper.BuilderQueryWrapper(&log)
+    注意, 此处必须使用指针参数 , 否则无法将结果映射到entity中
+    2. 具体函数: 请查看 <5 查询器函数介绍>
+   ```
+   - 3.2 UpdateWrapper
+   ```text
+    1. 创建更新器(用于增删改)
+        更新器大部分都可以使用匿名对象的形式进行传参, 但是执行Insert的时候必须传入指针对象, 否则若是自增ID则无法回填到entity中
+        第二个参数其实是个可变参数 , 但是此处只接受1个参数, 该参数的作用是是否开启事务, 默认为false(不开启)
+    2. 新增示例(构造器-无事务)
+        var log Logs
+        log.Title = "test"
+        qw := mapper.BuilderUpdateWrapper(&log)
+        qw.Insert()
+    3. 新增示例(构造器-开启事务)
+        var log Logs
+        log.Title = "test"
+        qw := mapper.BuilderUpdateWrapper(&log,true)
+        count := qw.Insert()
+        if (count == 0){
+            qw.Rollback()
+        }else {
+            qw.Commit()
+        }
+    4. 新增示例(便捷插入-永无事务)
+        var log Logs
+        log.Title = "test"
+        mapper.Insert(&log)
+    5. 新增示例(构造器-批量插入)
+        具体使用查看 Demo_test.go 下的 TestDemo1() 测试用例
+    6. 删除示例(构造器-无事务)
+        具体使用查看 Demo.go 下的 demo8() 测试用例
+    7. 删除示例(构造器-开启事务)
+        以此类推即可....
+    8. 删除示例(根据ID删除)
+        具体使用查看 Demo.go 下的 demo7() 测试用例
+    9. 删除示例(根据ID批量删除)
+        具体使用查看 Demo.go 下的 demo7_1() 测试用例
+    10. 删除示例(根据ID批量删除-便捷使用)
+        具体使用查看 Demo.go 下的 demo7_2() 测试用例
+    11. 修改示例(构造器-无事务)
+        以此类推即可....
+    12. 修改示例(构造器-开启事务)
+        以此类推即可....
+   ```
+ - 5 其他函数
    ```text
     SelectById(entity,id) 无返回值 , 查到的结果会直接映射到entity中
         根据id查询,传入的entity可以是单个对象,也可以是一个数组,但是建议使用数组
@@ -76,7 +131,7 @@
         4. 调用方法进行分页查询 pageData := mapper.Page(page) 必须: 必须接收返回值
             注: 可自行修改 PageData 类中的builder函数和Field来完成符合自己需求的分页结果集
    ```
-   -  2.1 QueryWrapper的使用
+- 6 查询器函数介绍
      - 如果你熟悉Java中的MyBatis的QueryWrapper,那本教程你将会很轻松
        - QueryWrapper的创建: `mapper.BuilderQueryWrapper(&log)`
            - 创建结果集接收对象 `var log []Logs` `var log Logs`
@@ -131,35 +186,19 @@
            - 参数1: flag , 是否执行此字段的更新
            - 参数2: column, 数据库列名 , 注意是数据库的
            - 参数3: value, 更新的值
- - 3 包含的函数(手动事务)   
-   ```text
-    若想使用手动事务, 请在增删改之前使用对应的Wapper构建器
-   1. BuilderInsertWrapper Insert构建器 , 其中包含两个参数 , 第一个参数与2.1使用方式一致,若是在实际中使用不到第一个参数可填nil , 第二个参数为是否开启自动事务 true:开启/false:不开启
-   注: 若开启自动事务 , 请勿忘记使用qw.Commit()进行提交
-   1.1 用不到第一个参数的函数列表
-      - Update4SQL
-      - DeleteById
-      - Delete4SQL
-      - Insert
-      - InsertCustom
-      - Insert4SQL
-   2. BuilderUpdateWrapper  Update构建器 使用方式同BuilderInsertWrapper
-   3. BuilderDeleteWrapper  Delete构建器 使用方式同BuilderInsertWrapper
-   
-   4. Commit() 提交事务
-   5. Rollback() 回滚事务
-   
-   使用示例:
-   qw := mapper.BuilderInsertWrapper(nil,true)
-   qw.Insert(&log)
-   qw.Commit()
-   // 若发生异常
-   // qw.Rollback()
-   
-   ```
- - 4 具体函数使用
+ - 7 具体函数使用
    ```text
     具体使用方式已在mapper.demo文件夹下
     其中Logs.go为实体类文件
     Demo.go是使用示例文件
    ```
+ - 8 其他函数的使用
+   - OpenLog() 开启日志
+   - OpenTransaction() 开启全局事务. 这样的话BuilderUpdateWrapper第二个参数不填也是true, 但若是填了,则以你填的为准
+   - GetOrm() 获取orm对象(禁止自己去NewOrm), 若使用,则直接通过该函数获取即可
+   - SpreadTransaction() 事务传播, 具体可看demo14()
+   - SetTransaction() 设置事务
+   - GetTransaction() 获取事务
+   - BenginTransaction() 开启事务
+   - Commit() 提交事务
+   - Rollback() 回滚事务
