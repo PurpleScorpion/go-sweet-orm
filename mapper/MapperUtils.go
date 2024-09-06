@@ -2,7 +2,7 @@ package mapper
 
 import (
 	"fmt"
-	"github.com/PurpleScorpion/go-sweet-orm/logger"
+	"github.com/PurpleScorpion/go-sweet-orm/v2/logger"
 	"github.com/beego/beego/v2/client/orm"
 	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/mattn/go-sqlite3"
@@ -67,7 +67,7 @@ func Register(activeDB, connStr string, params ...int) {
 
 	orm.SetMaxIdleConns("default", params1)
 	orm.SetMaxOpenConns("default", params2)
-
+	orm.Debug = false
 	o = orm.NewOrm()
 	dbActiveFlag = true
 }

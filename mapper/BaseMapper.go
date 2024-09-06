@@ -3,7 +3,7 @@ package mapper
 import (
 	"errors"
 	"fmt"
-	"github.com/PurpleScorpion/go-sweet-orm/logger"
+	"github.com/PurpleScorpion/go-sweet-orm/v2/logger"
 	"github.com/beego/beego/v2/client/orm"
 	"reflect"
 	"strings"
