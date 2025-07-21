@@ -5,6 +5,7 @@ import (
 	"github.com/PurpleScorpion/go-sweet-orm/logger"
 	"reflect"
 	"strings"
+	"time"
 )
 
 type MapperUtils struct {
@@ -283,6 +284,12 @@ func hasEmptyVal(val interface{}) bool {
 		}
 	case float64:
 		if val.(float64) == 0 {
+			return true
+		}
+	case bool:
+		return val.(bool)
+	case time.Time:
+		if val.(time.Time).IsZero() {
 			return true
 		}
 	default:
