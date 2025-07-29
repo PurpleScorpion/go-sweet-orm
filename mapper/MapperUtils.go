@@ -164,6 +164,9 @@ func getQuerySQL(querys []queryCriteria) (string, []interface{}) {
 
 				baseSQL = fmt.Sprintf("%s and %s %s %s ", baseSQL, query.columns, getSqlKeyword(query.actions), str)
 			}
+			for i := 0; i < len(query.values); i++ {
+				values = append(values, query.values[i])
+			}
 		} else {
 			if query.actions == "IS_NULL" || query.actions == "IS_NOT_NULL" {
 				baseSQL = fmt.Sprintf("%s and %s %s ", baseSQL, query.columns, getSqlKeyword(query.actions))
@@ -172,9 +175,7 @@ func getQuerySQL(querys []queryCriteria) (string, []interface{}) {
 			}
 
 		}
-		for i := 0; i < len(query.values); i++ {
-			values = append(values, query.values[i])
-		}
+
 	}
 	return baseSQL, values
 }
