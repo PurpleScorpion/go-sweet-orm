@@ -8,10 +8,10 @@ import (
 func registerDemo() {
 	mapper.SetMySqlConf(mapper.MySQLConf{
 		UserName: "root",
-		Password: "MojiErEntIanXiAdi1gULiNgJinGguAi.520",
+		Password: "root",
 		DbName:   "demo",
 		Port:     3308,
-		Host:     "192.168.251.124",
+		Host:     "localhost",
 	})
 	mapper.RegisterMySql()
 }
