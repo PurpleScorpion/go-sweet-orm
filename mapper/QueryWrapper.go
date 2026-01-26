@@ -43,10 +43,9 @@ type querySort struct {
 	columns   string
 }
 
-func BuilderQueryWrapper(list interface{}) QueryWrapper {
-	var qw QueryWrapper
-	qw.resList = list
-	return qw
+func BuilderQueryWrapper() *QueryWrapper {
+	wrapper := &QueryWrapper{}
+	return wrapper
 }
 
 func (qw *QueryWrapper) Eq(flag bool, column string, value interface{}) *QueryWrapper {

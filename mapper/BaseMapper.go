@@ -1,10 +1,10 @@
 package mapper
 
 import (
-	"errors"
+	"context"
 	"fmt"
-	"github.com/PurpleScorpion/go-sweet-orm/v2/logger"
-	"github.com/beego/beego/v2/client/orm"
+	"github.com/PurpleScorpion/go-sweet-orm/v3/logger"
+	"gorm.io/gorm"
 	"reflect"
 	"strings"
 )
@@ -12,19 +12,21 @@ import (
 type BaseMapper struct {
 }
 
-func Page(page PageUtils) PageData {
+func Page[T comparable](page PageUtils) PageData {
 	qw := page.wrapper
 	offSet := page.getOffSet()
 	pageSize := page.getPageSize()
 	qw.lastSQL = fmt.Sprintf("limit %d,%d", offSet, pageSize)
-	err := qw.SelectList()
-	if err != nil {
-		panic(err)
-	}
+	list := SelectList[T](qw)
 	qw.lastSQL = ""
-	count := qw.SelectCount()
-	page.setTotalSize(count)
-	pageData := page.pageData()
+	count := SelectCount[T](qw)
+	page.setTotalSize(int64(count))
+
+	resList := make([]interface{}, len(list))
+	for i := 0; i < len(list); i++ {
+		resList[i] = list[i]
+	}
+	pageData := page.pageData(resList)
 	return pageData
 }
 
@@ -34,57 +36,44 @@ func Page(page PageUtils) PageData {
  * 1. 当传入为对象类型时, 会将结果集封装为一个对象(不推荐,因为go的空值没有null这个结果,只能判断id是否为0)
  * 2. 当传入对象为数组类型时 , 会将结果集封装为一个数组(推荐,可以通过判断数组length是否为0来判断是否存在数据)
  */
-func SelectById(obj interface{}, id interface{}) error {
-	idFieldName := getTableId(obj)
+func SelectById[T comparable](id interface{}) []T {
+	var zero T
+	idFieldName := getTableId(zero)
 	if idFieldName == "null" {
 		panic("Field 'Primary key' does not exist , Please check if the Tag of the primary key attribute in the entity class contains the tableId attribute")
 	}
 
-	tableName := getTableName(obj)
+	tableName := getTableName(zero)
 	if tableName == "null" {
 		panic("TableName method does not exist")
 	}
 
-	tp := getParmaStruct(obj)
+	tp := getParmaStruct(zero)
 	if tp == "null" {
 		panic("Input is neither a slice nor a struct")
-	}
-
-	if o == nil {
-		return errors.New("orm is null")
 	}
 
 	sql := fmt.Sprintf("select * from %s where %s = ?", tableName, idFieldName)
 	LogInfo("SelectById", fmt.Sprintf("Preparing: %s", sql))
 	LogInfo("SelectById", fmt.Sprintf("Parameters: %v", id))
-	r := o.Raw(sql, id)
-	if r == nil {
-		return errors.New("RawSeter is null")
+
+	result, err := gorm.G[T](globalDB).Raw(sql, id).Find(context.Background())
+	if err != nil {
+		logger.Error("SelectList failed: %v", err)
+		return result
 	}
-	if tp == "Array" {
-		_, err := r.QueryRows(obj)
-		if err != nil {
-			return err
-		}
-	} else {
-		err := r.QueryRow(obj)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
+	return result
 }
 
-func (qw *QueryWrapper) SelectList() error {
-	resList := qw.resList
-	tp := getParmaStruct(resList)
-	if tp == "null" {
-		panic("Input is neither a slice nor a struct")
+func SelectList[T comparable](qw *QueryWrapper) []T {
+
+	if qw == nil {
+		logger.Error("SelectList failed: QueryWrapper is nil")
+		return nil
 	}
-	if tp != "Array" {
-		panic("The result set parameter must be of array type")
-	}
-	tableName := getTableName(resList)
+
+	var zero T
+	tableName := getTableName(zero)
 	if tableName == "null" {
 		panic("TableName method does not exist")
 	}
@@ -94,29 +83,24 @@ func (qw *QueryWrapper) SelectList() error {
 	baseSQL = fmt.Sprintf("select * from %s where 1=1 %s", tableName, baseSQL)
 	LogInfo("SelectList", fmt.Sprintf("Preparing: %s", baseSQL))
 	LogInfo("SelectList", fmt.Sprintf("Parameters: %v", values))
-	if o == nil {
-		return errors.New("orm is nil")
-	}
-	r := o.Raw(baseSQL, values...)
-	if r == nil {
-		return errors.New("RawSeter is null")
-	}
 
-	_, err := r.QueryRows(resList)
+	result, err := gorm.G[T](globalDB).Raw(baseSQL, values...).Find(context.Background())
 	if err != nil {
-		return err
+		logger.Error("SelectList failed: %v", err)
+		return result
 	}
-	qw.resList = resList
-	return nil
+	return result
 }
 
-func (qw *QueryWrapper) SelectCount() int64 {
-	resList := qw.resList
-	tp := getParmaStruct(resList)
-	if tp == "null" {
-		panic("Input is neither a slice nor a struct")
+func SelectCount[T comparable](qw *QueryWrapper) int {
+
+	if qw == nil {
+		logger.Error("SelectCount failed: QueryWrapper is nil")
+		return 0
 	}
-	tableName := getTableName(resList)
+
+	var zero T
+	tableName := getTableName(zero)
 	if tableName == "null" {
 		panic("TableName method does not exist")
 	}
@@ -127,36 +111,29 @@ func (qw *QueryWrapper) SelectCount() int64 {
 	baseSQL = fmt.Sprintf("select count(*) from %s where 1=1 %s", tableName, baseSQL)
 	LogInfo("SelectCount", fmt.Sprintf("Preparing: %s", baseSQL))
 	LogInfo("SelectCount", fmt.Sprintf("Parameters: %v", values))
-	var count int64
-	if o == nil {
-		return 0
-	}
 
-	r := o.Raw(baseSQL, values...)
-	if r == nil {
-		logger.Error("RawSeter is null")
-		return 0
-	}
-	err := r.QueryRow(&count)
+	count, err := gorm.G[int](globalDB).Raw(baseSQL, values...).Find(context.Background())
 	if err != nil {
+		logger.Error("SelectCount failed: %v", err)
 		return 0
 	}
-	return count
+	if len(count) == 0 {
+		return 0
+	}
+	return count[0]
 }
 
-func (qw *UpdateWrapper) Delete() int64 {
-	resList := qw.object
-	tp := getParmaStruct(resList)
-	if tp == "null" {
-		panic("Input is neither a slice nor a struct")
-	}
-	tableName := getTableName(resList)
-	if tableName == "null" {
-		panic("TableName method does not exist")
+func Delete[T comparable](qw *UpdateWrapper) int64 {
+
+	if qw == nil {
+		logger.Error("Delete failed: UpdateWrapper is nil")
+		return 0
 	}
 
-	if o == nil {
-		return 0
+	var zero T
+	tableName := getTableName(zero)
+	if tableName == "null" {
+		panic("TableName method does not exist")
 	}
 
 	baseSQL := fmt.Sprintf("delete from %s where 1=1 ", tableName)
@@ -170,66 +147,44 @@ func (qw *UpdateWrapper) Delete() int64 {
 	}
 	LogInfo("Delete", fmt.Sprintf("Preparing: %s", baseSQL))
 	LogInfo("Delete", fmt.Sprintf("Parameters: %v", values))
-	r := o.Raw(baseSQL, values...)
-	if r == nil {
-		logger.Error("RawSeter is null")
-		return 0
+
+	db := globalDB
+	if qw.txFlag && qw.txOrmer != nil {
+		db = qw.txOrmer
 	}
-	res, err := r.Exec()
+	result := gorm.WithResult()
+	// Execute with parameters
+	err := gorm.G[any](db, result).Exec(context.Background(), baseSQL, values...)
+
 	if err != nil {
 		logger.Error("Delete failed: %v", err)
 		return 0
 	}
-	if res == nil {
-		logger.Error("Delete exec result is null")
+	return result.RowsAffected
+}
+
+func DeleteByIds[T comparable](ids interface{}, qw *UpdateWrapper) int64 {
+
+	if qw == nil {
+		logger.Error("DeleteByIds failed: UpdateWrapper is nil")
 		return 0
 	}
 
-	count, err := res.RowsAffected()
-	if err != nil {
-		logger.Error("Delete RowsAffected failed: %v", err)
-		return 0
-	}
-	return count
-}
-
-func (qw *UpdateWrapper) DeleteByIds(ids interface{}) int64 {
-	return delByIds(qw.object, ids, qw)
-}
-func DeleteByIds(obj interface{}, ids interface{}) int64 {
-	return delByIds(obj, ids, nil)
-}
-
-func delByIds(obj interface{}, ids interface{}, qw *UpdateWrapper) int64 {
-	idFieldName := getTableId(obj)
+	var zero T
+	idFieldName := getTableId(zero)
 	if idFieldName == "null" {
 		panic("Field 'Primary key' does not exist , Please check if the Tag of the primary key attribute in the entity class contains the tableId attribute")
 	}
 
-	tableName := getTableName(obj)
+	tableName := getTableName(zero)
 	if tableName == "null" {
 		panic("TableName method does not exist")
 	}
 
-	tp := getParmaStruct(obj)
-	if tp == "null" {
-		panic("Input is neither a slice nor a struct")
+	db := globalDB
+	if qw.txFlag && qw.txOrmer != nil {
+		db = qw.txOrmer
 	}
-
-	if !isSlice(ids) {
-		panic("ids parameter is not a slice")
-	}
-	if qw != nil {
-		return delByIds4Tx(idFieldName, tableName, ids, qw)
-	}
-	return delByIds4NoTx(idFieldName, tableName, ids)
-}
-
-func delByIds4Tx(idFieldName, tableName string, ids interface{}, qw *UpdateWrapper) int64 {
-	if !qw.txFlag || qw.txOrmer == nil {
-		return delById4NoTx(idFieldName, tableName, ids)
-	}
-
 	// 获取 ids 的反射值
 	idsVal := reflect.ValueOf(ids)
 	var str strings.Builder
@@ -247,174 +202,68 @@ func delByIds4Tx(idFieldName, tableName string, ids interface{}, qw *UpdateWrapp
 	LogInfo("DeleteByIds", fmt.Sprintf("Preparing: %s", sql))
 	LogInfo("DeleteByIds", fmt.Sprintf("Parameters: %v", ids))
 
-	r := qw.txOrmer.Raw(sql, ids)
-	if r == nil {
-		logger.Error("RawSeter is null")
-		return 0
-	}
-	res, err := r.Exec()
-	if err != nil {
-		logger.Error("Delete failed: %v", err)
-		return 0
-	}
-	if res == nil {
-		logger.Error("Delete exec result is null")
-		return 0
-	}
-	count, err := res.RowsAffected()
-	if err != nil {
-		logger.Error("Delete RowsAffected failed: %v", err)
-		return 0
-	}
-	return count
-}
-
-func delByIds4NoTx(idFieldName, tableName string, ids interface{}) int64 {
-	if o == nil {
-		return 0
-	}
-	// 获取 ids 的反射值
-	idsVal := reflect.ValueOf(ids)
-	var str strings.Builder
-	str.WriteString("(")
-	// 遍历切片
-	for i := 0; i < idsVal.Len(); i++ {
-		if i == idsVal.Len()-1 {
-			str.WriteString("?")
-		} else {
-			str.WriteString("?,")
-		}
-	}
-	str.WriteString(")")
-	sql := fmt.Sprintf("delete from %s where %s in %s", tableName, idFieldName, str.String())
-	LogInfo("DeleteById", fmt.Sprintf("Preparing: %s", sql))
-	LogInfo("DeleteById", fmt.Sprintf("Parameters: %v", ids))
-
-	r := o.Raw(sql, ids)
-	if r == nil {
-		logger.Error("RawSeter is null")
-		return 0
-	}
-	res, err := r.Exec()
+	result := gorm.WithResult()
+	// Execute with parameters
+	err := gorm.G[any](db, result).Exec(context.Background(), sql, ids)
 
 	if err != nil {
 		logger.Error("Delete failed: %v", err)
 		return 0
 	}
-	if res == nil {
-		logger.Error("Delete exec result is null")
-		return 0
-	}
-	count, err := res.RowsAffected()
-	if err != nil {
-		logger.Error("Delete RowsAffected failed: %v", err)
-		return 0
-	}
-	return count
+	return result.RowsAffected
 }
 
 // 使用事务的删除
-func (qw *UpdateWrapper) DeleteById(id interface{}) int64 {
-	return delById(qw.object, id, qw)
-}
+func DeleteById[T comparable](id interface{}, qw *UpdateWrapper) int64 {
 
-// 不使用事务的快捷删除
-func DeleteById(obj interface{}, id interface{}) int64 {
-	return delById(obj, id, nil)
-}
+	if qw == nil {
+		logger.Error("DeleteById failed: UpdateWrapper is nil")
+		return 0
+	}
 
-func delById(obj interface{}, id interface{}, qw *UpdateWrapper) int64 {
-	idFieldName := getTableId(obj)
+	var zero T
+	idFieldName := getTableId(zero)
 	if idFieldName == "null" {
 		panic("Field 'Primary key' does not exist , Please check if the Tag of the primary key attribute in the entity class contains the tableId attribute")
 	}
 
-	tableName := getTableName(obj)
+	tableName := getTableName(zero)
 	if tableName == "null" {
 		panic("TableName method does not exist")
 	}
 
-	tp := getParmaStruct(obj)
-	if tp == "null" {
-		panic("Input is neither a slice nor a struct")
-	}
-
-	if qw != nil {
-		return delById4Tx(idFieldName, tableName, id, qw)
-	}
-	return delById4NoTx(idFieldName, tableName, id)
-}
-
-func delById4Tx(idFieldName, tableName string, id interface{}, qw *UpdateWrapper) int64 {
-
-	if !qw.txFlag || qw.txOrmer == nil {
-		return delById4NoTx(idFieldName, tableName, id)
+	db := globalDB
+	if qw.txFlag && qw.txOrmer != nil {
+		db = qw.txOrmer
 	}
 	sql := fmt.Sprintf("delete from %s where %s = ?", tableName, idFieldName)
 	LogInfo("DeleteById", fmt.Sprintf("Preparing: %s", sql))
 	LogInfo("DeleteById", fmt.Sprintf("Parameters: %v", id))
 
-	r := qw.txOrmer.Raw(sql, id)
-	if r == nil {
-		logger.Error("RawSeter is null")
-		return 0
-	}
-	res, err := r.Exec()
-	if err != nil {
-		logger.Error("Delete failed: %v", err)
-		return 0
-	}
-	if res == nil {
-		logger.Error("Delete exec result is null")
-		return 0
-	}
-	count, err := res.RowsAffected()
-	if err != nil {
-		logger.Error("Delete RowsAffected failed: %v", err)
-		return 0
-	}
-	return count
-
-}
-
-func delById4NoTx(idFieldName, tableName string, id interface{}) int64 {
-	if o == nil {
-		return 0
-	}
-	sql := fmt.Sprintf("delete from %s where %s = ?", tableName, idFieldName)
-	LogInfo("DeleteById", fmt.Sprintf("Preparing: %s", sql))
-	LogInfo("DeleteById", fmt.Sprintf("Parameters: %v", id))
-
-	r := o.Raw(sql, id)
-	if r == nil {
-		logger.Error("RawSeter is null")
-		return 0
-	}
-	res, err := r.Exec()
+	result := gorm.WithResult()
+	// Execute with parameters
+	err := gorm.G[any](db, result).Exec(context.Background(), sql, id)
 
 	if err != nil {
 		logger.Error("Delete failed: %v", err)
 		return 0
 	}
-	if res == nil {
-		logger.Error("Delete exec result is null")
-		return 0
-	}
-	count, err := res.RowsAffected()
-	if err != nil {
-		logger.Error("Delete RowsAffected failed: %v", err)
-		return 0
-	}
-	return count
+	return result.RowsAffected
 }
 
-func (qw *UpdateWrapper) Update() int64 {
-	resList := qw.object
-	tp := getParmaStruct(resList)
+func Update[T comparable](qw *UpdateWrapper) int64 {
+
+	if qw == nil {
+		logger.Error("Update failed: UpdateWrapper is nil")
+		return 0
+	}
+
+	var zero T
+	tp := getParmaStruct(zero)
 	if tp == "null" {
 		panic("Input is neither a slice nor a struct")
 	}
-	tableName := getTableName(resList)
+	tableName := getTableName(zero)
 	if tableName == "null" {
 		panic("TableName method does not exist")
 	}
@@ -424,7 +273,7 @@ func (qw *UpdateWrapper) Update() int64 {
 	values := make([]interface{}, 0)
 	baseSQL := fmt.Sprintf("update %s ", tableName)
 
-	// 去除flage为false的更新字段
+	// 去除flag为false的更新字段
 	qw.removeFalseUpdates()
 
 	if len(qw.updates) == 1 {
@@ -460,71 +309,58 @@ func (qw *UpdateWrapper) Update() int64 {
 	LogInfo("Update", fmt.Sprintf("Preparing: %s", baseSQL))
 	LogInfo("Update", fmt.Sprintf("Parameters: %v", values))
 
-	var r orm.RawSeter
+	db := globalDB
+	if qw.txFlag && qw.txOrmer != nil {
+		db = qw.txOrmer
+	}
 
-	if !qw.txFlag || qw.txOrmer == nil {
-		if o == nil {
-			return 0
-		}
-		r = o.Raw(baseSQL, values...)
-	} else {
-		r = qw.txOrmer.Raw(baseSQL, values...)
-	}
-	if r == nil {
-		logger.Error("RawSeter is null")
-		return 0
-	}
-	res, err := r.Exec()
+	result := gorm.WithResult()
+	// Execute with parameters
+	err := gorm.G[any](db, result).Exec(context.Background(), baseSQL, values...)
+
 	if err != nil {
 		logger.Error("Update failed: %v", err)
 		return 0
 	}
-	count, err := res.RowsAffected()
-	if err != nil {
-		logger.Error("Update RowsAffected failed: %v", err)
-		return 0
-	}
-	return count
-
+	return result.RowsAffected
 }
 
 // 批量插入 - 可极大提高效率
 // bulk, 单次插入数量
-func (qw *UpdateWrapper) InsertAll(bulk int, excludeEmpty bool, excludeField ...string) int64 {
-	sind := reflect.Indirect(reflect.ValueOf(qw.object))
-	switch sind.Kind() {
-	case reflect.Array, reflect.Slice:
-		if sind.Len() == 0 {
-			return 0
-		}
-	default:
+func InsertAll[T comparable](list []*T, qw *UpdateWrapper) int64 {
+
+	if qw == nil {
+		logger.Error("InsertAll failed: UpdateWrapper is nil")
 		return 0
 	}
 
-	if bulk <= 1 {
-		var count int64 = 0
-		for i := 0; i < sind.Len(); i++ {
-			count += baseInsert(sind.Index(i).Interface(), true, qw, excludeField...)
-		}
-		return count
-	} else {
-		idFieldName := getTableId(sind.Index(0).Interface())
-		if idFieldName == "null" {
-			panic("Field 'Primary key' does not exist , Please check if the Tag of the primary key attribute in the entity class contains the tableId attribute")
-		}
+	bulk := 2000
 
-		tableName := getTableName(sind.Index(0).Interface())
-		if tableName == "null" {
-			panic("TableName method does not exist")
-		}
-
-		return insertMulti(idFieldName, tableName, qw, bulk, excludeEmpty, excludeField...)
+	if len(list) == 0 {
+		return 0
 	}
+
+	// 将 []T 转换为 []interface{}
+	params := make([]interface{}, len(list))
+	for i, v := range list {
+		params[i] = v
+	}
+
+	idFieldName := getTableId(params[0])
+	if idFieldName == "null" {
+		panic("Field 'Primary key' does not exist , Please check if the Tag of the primary key attribute in the entity class contains the tableId attribute")
+	}
+	tableName := getTableName(params[0])
+	if tableName == "null" {
+		panic("TableName method does not exist")
+	}
+
+	return insertMulti(idFieldName, tableName, params, bulk, qw)
 }
 
-func insertMulti(idFieldName, tableName string, qw *UpdateWrapper, bulk int, excludeEmpty bool, excludeField ...string) int64 {
-	sind := reflect.ValueOf(qw.object)
-	fields, _, _ := getExcludeFiledName(sind.Index(0).Interface(), tableName, excludeField, idFieldName, excludeEmpty)
+func insertMulti(idFieldName, tableName string, params []interface{}, bulk int, qw *UpdateWrapper) int64 {
+	sind := reflect.ValueOf(params)
+	fields, _, _ := getExcludeFiledName(sind.Index(0).Interface(), tableName, qw.excludeField, idFieldName, qw.excludeEmpty)
 	if len(fields) == 0 {
 		panic("No fields were found")
 	}
@@ -558,7 +394,7 @@ func insertMulti(idFieldName, tableName string, qw *UpdateWrapper, bulk int, exc
 		values := make([]interface{}, 0)
 		for i := startIndex; i < endIndex; i++ {
 			sql2 := "("
-			fs, vals, _ := getExcludeFiledName(sind.Index(i).Interface(), tableName, excludeField, idFieldName, excludeEmpty)
+			fs, vals, _ := getExcludeFiledName(sind.Index(i).Interface(), tableName, qw.excludeField, idFieldName, qw.excludeEmpty)
 			//遍历字段
 			for x := 0; x < len(fs); x++ {
 
@@ -577,62 +413,32 @@ func insertMulti(idFieldName, tableName string, qw *UpdateWrapper, bulk int, exc
 			values = append(values, vals...)
 		}
 
-		var r orm.RawSeter
+		// 启动事务
+		db := globalDB.Begin()
 
-		if !qw.txFlag || qw.txOrmer == nil {
-			if o == nil {
-				return 0
-			}
-			r = o.Raw(baseSQL+ss, values...)
-		} else {
-			r = qw.txOrmer.Raw(baseSQL+ss, values...)
-		}
-		if r == nil {
-			logger.Error("RawSeter is null")
-			return 0
-		}
-		res, err := r.Exec()
+		result := gorm.WithResult()
+		// Execute with parameters
+		err := gorm.G[any](db, result).Exec(context.Background(), baseSQL+ss, values...)
 		if err != nil {
 			logger.Error("Insert failed: %v", err)
+			//失败时回滚事务
+			db.Rollback()
 			return 0
 		}
-
-		count, err := res.RowsAffected()
-		if err != nil {
-			logger.Error("Insert RowsAffected failed: %v", err)
-			return 0
-		}
-		sum += count
-
+		db.Commit()
+		sum += result.RowsAffected
 	}
+
 	return sum
 }
 
-func (qw *UpdateWrapper) Insert(excludeField ...string) int64 {
-	return baseInsert(qw.object, true, qw, excludeField...)
-}
+func Insert[T comparable](pojo *T, qw *UpdateWrapper) int64 {
 
-// 默认 自增主键和空值排除的新增
-func Insert(pojo interface{}, excludeField ...string) int64 {
-	return baseInsert(pojo, true, nil, excludeField...)
-}
+	if qw == nil {
+		logger.Error("Insert failed: UpdateWrapper is nil")
+		return 0
+	}
 
-// 默认 自增主键和空值排除的新增
-func InsertCustom(pojo interface{}, excludeEmpty bool, excludeField ...string) int64 {
-	return baseInsert(pojo, excludeEmpty, nil, excludeField...)
-}
-
-func (qw *UpdateWrapper) InsertCustom(excludeEmpty bool, excludeField ...string) int64 {
-	return baseInsert(qw.object, excludeEmpty, qw, excludeField...)
-}
-
-/*
-pojo: 实体对象
-autoId: 是否为自增主键
-excludeEmpty: 是否排除空值
-excludeField: 排除字段 - 数据库表字段名
-*/
-func baseInsert(pojo interface{}, excludeEmpty bool, qw *UpdateWrapper, excludeField ...string) int64 {
 	idFieldName := getTableId(pojo)
 	if idFieldName == "null" {
 		panic("Field 'Primary key' does not exist , Please check if the Tag of the primary key attribute in the entity class contains the tableId attribute")
@@ -649,6 +455,13 @@ func baseInsert(pojo interface{}, excludeEmpty bool, qw *UpdateWrapper, excludeF
 	}
 	if tp == "slice" {
 		panic("The pojo parameter cannot be of array type")
+	}
+
+	excludeField := make([]string, 0)
+	excludeEmpty := false
+	if qw != nil {
+		excludeField = qw.excludeField
+		excludeEmpty = qw.excludeEmpty
 	}
 
 	fields, values, autoId := getExcludeFiledName(pojo, tableName, excludeField, idFieldName, excludeEmpty)
@@ -673,77 +486,49 @@ func baseInsert(pojo interface{}, excludeEmpty bool, qw *UpdateWrapper, excludeF
 	baseSQL := fmt.Sprintf("insert into %s %s values %s", tableName, str1, str2)
 	LogInfo("Insert", fmt.Sprintf("Preparing: %s", baseSQL))
 	LogInfo("Insert", fmt.Sprintf("Parameters: %v", values))
-	var r orm.RawSeter
 
-	if qw == nil || !qw.txFlag || qw.txOrmer == nil {
-		if o == nil {
-			return 0
-		}
-		r = o.Raw(baseSQL, values...)
-	} else {
-		r = qw.txOrmer.Raw(baseSQL, values...)
+	db := globalDB
+	if qw != nil && qw.txFlag && qw.txOrmer != nil {
+		db = qw.txOrmer
 	}
-	if r == nil {
-		logger.Error("RawSeter is null")
-		return 0
-	}
-	res, err := r.Exec()
+	result := gorm.WithResult()
+	// Execute with parameters
+	err := gorm.G[any](db, result).Exec(context.Background(), baseSQL, values...)
+
 	if err != nil {
-		logger.Error("Insert failed: %v", err)
+		logger.Error("Update failed: %v", err)
 		return 0
 	}
+
 	if autoId {
-		lastId, err1 := res.LastInsertId()
+		lastId, err1 := result.Result.LastInsertId()
 		if err1 != nil {
 			logger.Error("Get LastInsertId failed: %v", err1)
 			return 0
 		}
 		saveLastInsertId(pojo, lastId)
 	}
-	count, err := res.RowsAffected()
-	if err != nil {
-		logger.Error("Insert RowsAffected failed: %v", err)
-		return 0
-	}
-	return count
+	return result.RowsAffected
 }
 
-func SelectCount4SQL(sql string, values ...interface{}) int64 {
-	var count int64
-	if o == nil {
-		return 0
-	}
-	r := o.Raw(sql, values...)
-	if r == nil {
-		logger.Error("RawSeter is null")
-		return 0
-	}
-	err := r.QueryRow(&count)
+func SelectCount4SQL(sql string, values ...interface{}) int {
+	count, err := gorm.G[int](globalDB).Raw(sql, values...).Find(context.Background())
 	if err != nil {
+		logger.Error("SelectCount4SQL failed: %v", err)
 		return 0
 	}
-	return count
+	if len(count) == 0 {
+		return 0
+	}
+	return count[0]
 }
-func SelectList4SQL(resList interface{}, sql string, values ...interface{}) error {
-	tp := getParmaStruct(resList)
-	if tp == "null" {
-		return errors.New("Input is neither a slice")
-	}
-	if tp != "Array" {
-		return errors.New("The result set parameter must be of array type")
-	}
-	if o == nil {
-		return errors.New("orm is nil")
-	}
-	r := o.Raw(sql, values...)
-	if r == nil {
-		return errors.New("RawSeter is null")
-	}
-	_, err := r.QueryRows(resList)
+func SelectList4SQL[T comparable](sql string, values ...interface{}) []T {
+	result, err := gorm.G[T](globalDB).Raw(sql, values...).Find(context.Background())
 	if err != nil {
-		return err
+		logger.Error("SelectList4SQL failed: %v", err)
+		return result
 	}
-	return nil
+	return result
 }
 
 /*
@@ -758,69 +543,33 @@ return:
 	返回值1: 影响的行数
 	返回值2: 插入后的自增主键值 , 受autoId参数影响
 */
-func (qw *UpdateWrapper) Insert4SQL(autoId bool, sql string, values ...interface{}) (int64, int64) {
-
-	var r orm.RawSeter
-
-	if !qw.txFlag || qw.txOrmer == nil {
-		if o == nil {
-			return 0, 0
-		}
-		r = o.Raw(sql, values...)
-	} else {
-		r = qw.txOrmer.Raw(sql, values...)
-	}
-	if r == nil {
-		logger.Error("RawSeter is null")
+func Insert4SQL(qw *UpdateWrapper) (int64, int64) {
+	if qw == nil {
+		logger.Error("Insert4SQL failed: UpdateWrapper is nil")
 		return 0, 0
 	}
-	res, err := r.Exec()
+	if isEmpty(qw.baseSql) {
+		logger.Error("Insert4SQL failed: baseSql is null")
+		return 0, 0
+	}
+
+	db := globalDB
+	if qw.txFlag && qw.txOrmer != nil {
+		db = qw.txOrmer
+	}
+
+	// Execute raw SQL
+	result := gorm.WithResult()
+	// Execute with parameters
+	err := gorm.G[any](db, result).Exec(context.Background(), qw.baseSql, qw.values...)
+
 	if err != nil {
 		logger.Error("Insert4SQL failed: %v", err)
 		return 0, 0
 	}
-	count, err := res.RowsAffected()
-	if err != nil {
-		logger.Error("Insert4SQL RowsAffected failed: %v", err)
-		return 0, 0
-	}
-	if autoId {
-		lastId, err1 := res.LastInsertId()
-		if err1 != nil {
-			logger.Error("Get LastInsertId failed: %v", err1)
-			return 0, 0
-		}
-		return count, lastId
-	}
-	return count, 0
-}
-
-// 无事务的自定义插入
-func Insert4SQL(autoId bool, sql string, values ...interface{}) (int64, int64) {
-
-	var r orm.RawSeter
-
-	if o == nil {
-		return 0, 0
-	}
-	r = o.Raw(sql, values...)
-
-	if r == nil {
-		logger.Error("RawSeter is null")
-		return 0, 0
-	}
-	res, err := r.Exec()
-	if err != nil {
-		logger.Error("Insert4SQL failed: %v", err)
-		return 0, 0
-	}
-	count, err := res.RowsAffected()
-	if err != nil {
-		logger.Error("Insert4SQL RowsAffected failed: %v", err)
-		return 0, 0
-	}
-	if autoId {
-		lastId, err1 := res.LastInsertId()
+	count := result.RowsAffected
+	if qw.autoId {
+		lastId, err1 := result.Result.LastInsertId()
 		if err1 != nil {
 			logger.Error("Get LastInsertId failed: %v", err1)
 			return 0, 0
@@ -834,86 +583,47 @@ func Insert4SQL(autoId bool, sql string, values ...interface{}) (int64, int64) {
 原生sql的方式进行更新
 return:  影响的行数
 */
-func (qw *UpdateWrapper) Update4SQL(sql string, values ...interface{}) int64 {
-	return qw.exec4SQL(sql, values...)
+func Update4SQL(qw *UpdateWrapper) int64 {
+	if qw == nil {
+		logger.Error("Update4SQL failed: UpdateWrapper is nil")
+		return 0
+	}
+	if isEmpty(qw.baseSql) {
+		logger.Error("Update4SQL failed: baseSql is null")
+		return 0
+	}
+	return exec4SQL(qw)
 }
 
 /*
 原生sql的方式进行删除
 return: 影响的行数
 */
-func (qw *UpdateWrapper) Delete4SQL(sql string, values ...interface{}) int64 {
-	return qw.exec4SQL(sql, values...)
+func Delete4SQL(qw *UpdateWrapper) int64 {
+	if qw == nil {
+		logger.Error("Delete4SQL failed: UpdateWrapper is nil")
+		return 0
+	}
+	if isEmpty(qw.baseSql) {
+		logger.Error("Delete4SQL failed: baseSql is null")
+		return 0
+	}
+	return exec4SQL(qw)
 }
 
-func (qw *UpdateWrapper) exec4SQL(sql string, values ...interface{}) int64 {
+func exec4SQL(qw *UpdateWrapper) int64 {
 
-	var r orm.RawSeter
-
-	if !qw.txFlag || qw.txOrmer == nil {
-		if o == nil {
-			return 0
-		}
-		r = o.Raw(sql, values...)
-	} else {
-		r = qw.txOrmer.Raw(sql, values...)
+	db := globalDB
+	if qw.txFlag && qw.txOrmer != nil {
+		db = qw.txOrmer
 	}
-	if r == nil {
-		logger.Error("RawSeter is null")
-		return 0
-	}
-
-	res, err := r.Exec()
+	// Execute raw SQL
+	result := gorm.WithResult()
+	// Execute with parameters
+	err := gorm.G[any](db, result).Exec(context.Background(), qw.baseSql, qw.values...)
 	if err != nil {
-		logger.Error("exec4SQL failed: %v", err)
+		logger.Error("EXEC SQL failed: %v", err)
 		return 0
 	}
-	count, err := res.RowsAffected()
-	if err != nil {
-		logger.Error("exec4SQL RowsAffected failed: %v", err)
-		return 0
-	}
-	return count
-}
-
-/*
-原生sql的方式进行更新
-return:  影响的行数
-*/
-func Update4SQL(sql string, values ...interface{}) int64 {
-	return exec4SQL(sql, values...)
-}
-
-/*
-原生sql的方式进行删除
-return: 影响的行数
-*/
-func Delete4SQL(sql string, values ...interface{}) int64 {
-	return exec4SQL(sql, values...)
-}
-
-func exec4SQL(sql string, values ...interface{}) int64 {
-
-	var r orm.RawSeter
-
-	if o == nil {
-		return 0
-	}
-	r = o.Raw(sql, values...)
-	if r == nil {
-		logger.Error("RawSeter is null")
-		return 0
-	}
-
-	res, err := r.Exec()
-	if err != nil {
-		logger.Error("exec4SQL failed: %v", err)
-		return 0
-	}
-	count, err := res.RowsAffected()
-	if err != nil {
-		logger.Error("exec4SQL RowsAffected failed: %v", err)
-		return 0
-	}
-	return count
+	return result.RowsAffected
 }

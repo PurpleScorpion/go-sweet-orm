@@ -1,11 +1,14 @@
 package mapper
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
-	"github.com/PurpleScorpion/go-sweet-orm/v2/logger"
-	"github.com/beego/beego/v2/client/orm"
-	_ "github.com/go-sql-driver/mysql"
-	_ "github.com/mattn/go-sqlite3"
+	"github.com/PurpleScorpion/go-sweet-orm/v3/logger"
+	msql "github.com/go-sql-driver/mysql"
+	"gorm.io/driver/mysql"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 	"reflect"
 	"strings"
 )
@@ -22,69 +25,112 @@ var (
 	Sqlite          = "sqlite3"
 	active_db       = ""
 	active_log      = false
-	o               orm.Ormer
-	dataSource      string
-	params1         = 50
-	params2         = 100
 	dbActiveFlag    = false
-	transaction     = false // 全局事务
+	globalDB        *gorm.DB
+	mysqlConf       = MySQLConf{}
 )
 
-func Register(activeDB, connStr string, params ...int) {
-	if dbActiveFlag {
-		panic("Database is already registered")
+type MySQLConf struct {
+	UserName     string
+	Password     string
+	DbName       string
+	Port         int
+	Host         string
+	Charset      string
+	Loc          string
+	MaxIdleConn  int
+	MaxOpenConn  int
+	TlsCertPool  *x509.CertPool
+	RegisterFlag bool
+}
+
+func SetMySqlConf(dbConf MySQLConf) {
+	if isEmpty(dbConf.UserName) {
+		panic("UserName is empty")
+	}
+	if isEmpty(dbConf.Password) {
+		panic("Password is empty")
+	}
+	if isEmpty(dbConf.DbName) {
+		panic("DbName is empty")
+	}
+	if dbConf.Port == 0 {
+		dbConf.Port = 3306
 	}
 
-	if isEmpty(activeDB) {
-		panic("ActiveDB is empty")
+	if dbConf.Port < 0 || dbConf.Port > 65535 {
+		panic("mysql port is invalid")
 	}
-	if activeDB != MySQL && activeDB != Sqlite {
-		panic(activeDB + " is not support")
+	if isEmpty(dbConf.Host) {
+		panic("Host is empty")
 	}
-	if isEmpty(connStr) {
-		panic("Connection string is empty")
+	if isEmpty(dbConf.Charset) {
+		dbConf.Charset = "utf8mb4"
 	}
-	active_db = activeDB
-	dataSource = connStr
-	for i, v := range params {
-		switch i {
-		case 0:
-			params1 = v
-			break
-		case 1:
-			params2 = v
-			break
-		}
+	if isEmpty(dbConf.Loc) {
+		dbConf.Loc = "Local"
 	}
 
-	if activeDB == MySQL {
-		orm.RegisterDriver("mysql", orm.DRMySQL)
-		orm.RegisterDataBase("default", "mysql", dataSource)
-	} else {
-		orm.RegisterDriver("sqlite3", orm.DRSqlite)
-		orm.RegisterDataBase("default", "sqlite3", dataSource)
+	if dbConf.MaxIdleConn == 0 {
+		dbConf.MaxIdleConn = 10
 	}
+	if dbConf.MaxOpenConn == 0 {
+		dbConf.MaxIdleConn = 100
+	}
+	dbConf.RegisterFlag = true
+	mysqlConf = dbConf
+	active_db = MySQL
+}
 
-	orm.SetMaxIdleConns("default", params1)
-	orm.SetMaxOpenConns("default", params2)
-	orm.Debug = false
-	o = orm.NewOrm()
+func ResisterSqlite(dbPath string) {
+	if isEmpty(dbPath) {
+		panic("dbPath is empty")
+	}
+	// github.com/mattn/go-sqlite3
+	db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{})
+	if err != nil {
+		panic(fmt.Sprintf("Failed to connect to database: %v", err))
+	}
+	globalDB = db
+	active_db = Sqlite
 	dbActiveFlag = true
 }
 
-// 开启全局事务 这样的话 BuilderUpdateWrapper 函数就不需要填写第二个参数了
-// 如果你填了 BuilderUpdateWrapper 的第二个参数 , 那将以你填的为准
-func OpenTransaction() {
-	transaction = true
+func RegisterMySql() {
+	if !mysqlConf.RegisterFlag {
+		panic("Please register mysql first")
+	}
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=%s&parseTime=True&loc=%s",
+		mysqlConf.UserName, mysqlConf.Password, mysqlConf.Host, mysqlConf.Port, mysqlConf.DbName, mysqlConf.Charset, mysqlConf.Loc)
+	if mysqlConf.TlsCertPool != nil {
+		// 注册自定义 TLS 配置
+		msql.RegisterTLSConfig("custom-tls", &tls.Config{
+			RootCAs: mysqlConf.TlsCertPool,
+		})
+		// 在 DSN 中指定使用自定义 TLS 配置
+		dsn += "&tls=custom-tls"
+	}
+
+	// 创建 GORM 连接
+	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	if err != nil {
+		panic(fmt.Sprintf("Failed to connect to database: %v", err))
+	}
+
+	// 设置连接池
+	sqlDB, err := db.DB()
+	if err != nil {
+		panic(fmt.Sprintf("Failed to get database instance: %v", err))
+	}
+	sqlDB.SetMaxIdleConns(mysqlConf.MaxIdleConn)
+	sqlDB.SetMaxOpenConns(mysqlConf.MaxOpenConn)
+	// 可能需要存储全局 DB 实例
+	globalDB = db
+	dbActiveFlag = true
 }
 
 func OpenLog() {
 	active_log = true
-}
-
-// 建议使用该函数去获取ORM 而不是通过NewOrm的方式
-func GetOrm() orm.Ormer {
-	return o
 }
 
 func (qw *UpdateWrapper) removeFalseUpdates() *UpdateWrapper {

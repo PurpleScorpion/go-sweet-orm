@@ -1,14 +1,14 @@
 package mapper
 
 type PageUtils struct {
-	thisPage  int32        // 当前页 	必须 默认1
-	pageSize  int32        // 每页条数 必须 默认10
-	totalSize int64        // 总条数 非用户添加
-	totalPage int32        // 总页数 非用户添加
-	wrapper   QueryWrapper // 条件查询器
+	thisPage  int32         // 当前页 	必须 默认1
+	pageSize  int32         // 每页条数 必须 默认10
+	totalSize int64         // 总条数 非用户添加
+	totalPage int32         // 总页数 非用户添加
+	wrapper   *QueryWrapper // 条件查询器
 }
 
-func BuilderPageUtils(thisPage int32, pageSize int32, wrapper QueryWrapper) PageUtils {
+func BuilderPageUtils(thisPage int32, pageSize int32, wrapper *QueryWrapper) PageUtils {
 	return PageUtils{thisPage: thisPage, pageSize: pageSize, wrapper: wrapper}
 }
 
@@ -51,6 +51,6 @@ func (p *PageUtils) getTotalPage() int32 {
 	return int32(totalPage)
 }
 
-func (p *PageUtils) pageData() PageData {
-	return builderPageData(p.getThisPage(), p.getPageSize(), p.totalSize, p.getTotalPage(), p.wrapper.resList)
+func (p *PageUtils) pageData(resList []interface{}) PageData {
+	return builderPageData(p.getThisPage(), p.getPageSize(), p.totalSize, p.getTotalPage(), resList)
 }

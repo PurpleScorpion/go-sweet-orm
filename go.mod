@@ -1,19 +1,18 @@
-module github.com/PurpleScorpion/go-sweet-orm/v2
+module github.com/PurpleScorpion/go-sweet-orm/v3
 
-go 1.20
+go 1.25.6
 
 require (
-	github.com/beego/beego/v2 v2.2.1
 	github.com/go-sql-driver/mysql v1.8.1
-	github.com/mattn/go-sqlite3 v1.14.23
+	gorm.io/driver/mysql v1.6.0
+	gorm.io/driver/sqlite v1.6.0
+	gorm.io/gorm v1.31.1
 )
 
 require (
 	filippo.io/edwards25519 v1.1.0 // indirect
-	github.com/PuerkitoBio/goquery v1.9.2 // indirect
-	github.com/andybalholm/cascadia v1.3.2 // indirect
-	github.com/hashicorp/golang-lru v0.5.4 // indirect
-	github.com/shiena/ansicolor v0.0.0-20200904210342-c7312218db18 // indirect
-	github.com/valyala/bytebufferpool v1.0.0 // indirect
-	golang.org/x/net v0.25.0 // indirect
+	github.com/jinzhu/inflection v1.0.0 // indirect
+	github.com/jinzhu/now v1.1.5 // indirect
+	github.com/mattn/go-sqlite3 v1.14.33 // indirect
+	golang.org/x/text v0.33.0 // indirect
 )

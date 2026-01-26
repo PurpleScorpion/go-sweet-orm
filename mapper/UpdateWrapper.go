@@ -2,41 +2,30 @@ package mapper
 
 import (
 	"errors"
-	"github.com/PurpleScorpion/go-sweet-orm/v2/logger"
-	"github.com/beego/beego/v2/client/orm"
+	"github.com/PurpleScorpion/go-sweet-orm/v3/logger"
+	"gorm.io/gorm"
 )
 
 type UpdateWrapper struct {
-	object  interface{}
-	query   []queryCriteria
-	updates []updateSet
-	lastSQL string
-	txOrmer orm.TxOrmer
-	txFlag  bool
+	object       interface{}
+	query        []queryCriteria
+	updates      []updateSet
+	lastSQL      string
+	txOrmer      *gorm.DB
+	txFlag       bool
+	excludeEmpty bool
+	excludeField []string
+	autoId       bool
+	baseSql      string
+	values       []interface{}
 }
 
-func BuilderUpdateWrapper(obj interface{}, flag ...bool) UpdateWrapper {
-	var wrapper UpdateWrapper
-	if len(flag) == 0 {
-		if !transaction {
-			wrapper.txFlag = false
-		} else {
-			wrapper.txFlag = true
-		}
-	} else {
-		wrapper.txFlag = flag[0]
+func BuilderUpdateWrapper(flag bool) *UpdateWrapper {
+	wrapper := &UpdateWrapper{}
+	if flag {
+		wrapper.txFlag = flag
+		wrapper.txOrmer = globalDB.Begin()
 	}
-
-	if wrapper.txFlag {
-		txOrmer, err := GetOrm().Begin()
-		if err != nil {
-			logger.Error("Transaction initiation failed: %v", err)
-			wrapper.txFlag = false
-		} else {
-			wrapper.txOrmer = txOrmer
-		}
-	}
-	wrapper.object = obj
 	return wrapper
 }
 
@@ -52,7 +41,7 @@ func (qw *UpdateWrapper) SpreadTransaction(other UpdateWrapper) *UpdateWrapper {
 }
 
 // 设置事务
-func (qw *UpdateWrapper) SetTransaction(tx orm.TxOrmer) *UpdateWrapper {
+func (qw *UpdateWrapper) SetTransaction(tx *gorm.DB) *UpdateWrapper {
 	if tx == nil {
 		logger.Error("The transaction parameter cannot be empty")
 		return qw
@@ -63,7 +52,7 @@ func (qw *UpdateWrapper) SetTransaction(tx orm.TxOrmer) *UpdateWrapper {
 }
 
 // 获取事务
-func (qw *UpdateWrapper) GetTransaction() orm.TxOrmer {
+func (qw *UpdateWrapper) GetTransaction() *gorm.DB {
 	if qw.txFlag {
 		return qw.txOrmer
 	}
@@ -71,21 +60,12 @@ func (qw *UpdateWrapper) GetTransaction() orm.TxOrmer {
 }
 
 // 手动开启事务
-func (qw *UpdateWrapper) BenginTransaction() error {
-	if qw.txFlag {
-		if qw.txOrmer != nil {
-			return nil
-		}
+func (qw *UpdateWrapper) BeginTransaction() {
+	if qw.txFlag && qw.txOrmer != nil {
+		return
 	}
 	qw.txFlag = true
-	txOrmer, err := GetOrm().Begin()
-	if err != nil {
-		qw.txFlag = false
-		logger.Error("Transaction initiation failed: %v", err)
-		return err
-	}
-	qw.txOrmer = txOrmer
-	return nil
+	qw.txOrmer = globalDB.Begin()
 }
 
 // 手动提交事务
@@ -96,7 +76,8 @@ func (qw *UpdateWrapper) Commit() error {
 	if qw.txOrmer == nil {
 		return errors.New("orm is nil")
 	}
-	return qw.txOrmer.Commit()
+	qw.txOrmer.Commit()
+	return nil
 }
 
 // 手动回滚事务
@@ -107,7 +88,29 @@ func (qw *UpdateWrapper) Rollback() error {
 	if qw.txOrmer == nil {
 		return errors.New("orm is nil")
 	}
-	return qw.txOrmer.Rollback()
+	qw.txOrmer.Rollback()
+	return nil
+}
+
+func (qw *UpdateWrapper) AutoId() *UpdateWrapper {
+	qw.autoId = true
+	return qw
+}
+
+func (qw *UpdateWrapper) SQL(sql string, values ...interface{}) *UpdateWrapper {
+	qw.baseSql = sql
+	qw.values = values
+	return qw
+}
+
+func (qw *UpdateWrapper) SetExcludeEmpty(flag bool) *UpdateWrapper {
+	qw.excludeEmpty = flag
+	return qw
+}
+
+func (qw *UpdateWrapper) SetExcludeField(excludeField ...string) *UpdateWrapper {
+	qw.excludeField = append(qw.excludeField, excludeField...)
+	return qw
 }
 
 func (qw *UpdateWrapper) Set(flag bool, column string, value interface{}) *UpdateWrapper {

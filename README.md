@@ -3,21 +3,22 @@
 ## go的持久层框架 V2
 
 ### 基础支持
- - beego框架作为基础框架  (github.com/beego/beego/v2 v2.2.1)
+ - gorm作为基础框架  (gorm.io/gorm v1.31.1)
  - 目前仅支持mysql和sqlite
 ### 使用方式
 
  - 1 引入包 
    ```text
-    go get github.com/PurpleScorpion/go-sweet-orm/v2@latest
+    go get github.com/PurpleScorpion/go-sweet-orm/v3@latest
     
    ```
    ```text
     使用以下语句来引入包
-    import "github.com/PurpleScorpion/go-sweet-orm/v2/mapper"
+    import "github.com/PurpleScorpion/go-sweet-orm/v3/mapper"
    ```
  - 2 注册数据库连接
      ```text
+     mapper.SetMySqlConf()
      mapper.Register(activeDB, connStr string, params ...int)  
          activeDB: 激活的数据库, 目前仅支持 mapper.MySQL 和 mapper.Sqlite
          connStr: 数据库连接字符串 (注意mysql是包含用户名密码的连接字符串, 但是Sqlite却是文件地址)
