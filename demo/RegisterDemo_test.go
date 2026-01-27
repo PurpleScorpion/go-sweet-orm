@@ -20,6 +20,9 @@ type user struct {
 	Id       int    `json:"id" tableId:"id"`
 	UserName string `json:"userName"`
 	Age      int    `json:"age"`
+	Word1    string `json:"word1"`
+	Word2    string `json:"word2"`
+	Word3    string `json:"word3"`
 }
 
 func (u user) TableName() string {

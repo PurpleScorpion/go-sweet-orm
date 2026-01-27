@@ -59,7 +59,7 @@ func SelectById[T comparable](id interface{}) []T {
 
 	result, err := gorm.G[T](globalDB).Raw(sql, id).Find(context.Background())
 	if err != nil {
-		logger.Error("SelectList failed: %v", err)
+		logger.Error("SelectList failed: {}", err)
 		return result
 	}
 	return result
@@ -86,7 +86,7 @@ func SelectList[T comparable](qw *QueryWrapper) []T {
 
 	result, err := gorm.G[T](globalDB).Raw(baseSQL, values...).Find(context.Background())
 	if err != nil {
-		logger.Error("SelectList failed: %v", err)
+		logger.Error("SelectList failed: {}", err)
 		return result
 	}
 	return result
@@ -114,7 +114,7 @@ func SelectCount[T comparable](qw *QueryWrapper) int {
 
 	count, err := gorm.G[int](globalDB).Raw(baseSQL, values...).Find(context.Background())
 	if err != nil {
-		logger.Error("SelectCount failed: %v", err)
+		logger.Error("SelectCount failed: {}", err)
 		return 0
 	}
 	if len(count) == 0 {
@@ -157,7 +157,7 @@ func Delete[T comparable](qw *UpdateWrapper) int64 {
 	err := gorm.G[any](db, result).Exec(context.Background(), baseSQL, values...)
 
 	if err != nil {
-		logger.Error("Delete failed: %v", err)
+		logger.Error("Delete failed: {}", err)
 		return 0
 	}
 	return result.RowsAffected
@@ -166,8 +166,7 @@ func Delete[T comparable](qw *UpdateWrapper) int64 {
 func DeleteByIds[T comparable](ids interface{}, qw *UpdateWrapper) int64 {
 
 	if qw == nil {
-		logger.Error("DeleteByIds failed: UpdateWrapper is nil")
-		return 0
+		qw = BuilderUpdateWrapper(false)
 	}
 
 	var zero T
@@ -187,10 +186,12 @@ func DeleteByIds[T comparable](ids interface{}, qw *UpdateWrapper) int64 {
 	}
 	// 获取 ids 的反射值
 	idsVal := reflect.ValueOf(ids)
+	vals := make([]interface{}, idsVal.Len())
 	var str strings.Builder
 	str.WriteString("(")
 	// 遍历切片
 	for i := 0; i < idsVal.Len(); i++ {
+		vals[i] = idsVal.Index(i).Interface()
 		if i == idsVal.Len()-1 {
 			str.WriteString("?")
 		} else {
@@ -198,16 +199,16 @@ func DeleteByIds[T comparable](ids interface{}, qw *UpdateWrapper) int64 {
 		}
 	}
 	str.WriteString(")")
+
 	sql := fmt.Sprintf("delete from %s where %s in %s", tableName, idFieldName, str.String())
 	LogInfo("DeleteByIds", fmt.Sprintf("Preparing: %s", sql))
-	LogInfo("DeleteByIds", fmt.Sprintf("Parameters: %v", ids))
-
+	LogInfo("DeleteByIds", fmt.Sprintf("Parameters: %v", vals))
 	result := gorm.WithResult()
 	// Execute with parameters
-	err := gorm.G[any](db, result).Exec(context.Background(), sql, ids)
+	err := gorm.G[any](db, result).Exec(context.Background(), sql, vals...)
 
 	if err != nil {
-		logger.Error("Delete failed: %v", err)
+		logger.Error("Delete failed: {}", err)
 		return 0
 	}
 	return result.RowsAffected
@@ -217,8 +218,7 @@ func DeleteByIds[T comparable](ids interface{}, qw *UpdateWrapper) int64 {
 func DeleteById[T comparable](id interface{}, qw *UpdateWrapper) int64 {
 
 	if qw == nil {
-		logger.Error("DeleteById failed: UpdateWrapper is nil")
-		return 0
+		qw = BuilderUpdateWrapper(false)
 	}
 
 	var zero T
@@ -245,7 +245,7 @@ func DeleteById[T comparable](id interface{}, qw *UpdateWrapper) int64 {
 	err := gorm.G[any](db, result).Exec(context.Background(), sql, id)
 
 	if err != nil {
-		logger.Error("Delete failed: %v", err)
+		logger.Error("Delete failed: {}", err)
 		return 0
 	}
 	return result.RowsAffected
@@ -319,7 +319,7 @@ func Update[T comparable](qw *UpdateWrapper) int64 {
 	err := gorm.G[any](db, result).Exec(context.Background(), baseSQL, values...)
 
 	if err != nil {
-		logger.Error("Update failed: %v", err)
+		logger.Error("Update failed: {}", err)
 		return 0
 	}
 	return result.RowsAffected
@@ -420,7 +420,7 @@ func insertMulti(idFieldName, tableName string, params []interface{}, bulk int, 
 		// Execute with parameters
 		err := gorm.G[any](db, result).Exec(context.Background(), baseSQL+ss, values...)
 		if err != nil {
-			logger.Error("Insert failed: %v", err)
+			logger.Error("Insert failed: {}", err)
 			//失败时回滚事务
 			db.Rollback()
 			return 0
@@ -496,14 +496,14 @@ func Insert[T comparable](pojo *T, qw *UpdateWrapper) int64 {
 	err := gorm.G[any](db, result).Exec(context.Background(), baseSQL, values...)
 
 	if err != nil {
-		logger.Error("Update failed: %v", err)
+		logger.Error("Update failed: {}", err)
 		return 0
 	}
 
 	if autoId {
 		lastId, err1 := result.Result.LastInsertId()
 		if err1 != nil {
-			logger.Error("Get LastInsertId failed: %v", err1)
+			logger.Error("Get LastInsertId failed: {}", err1)
 			return 0
 		}
 		saveLastInsertId(pojo, lastId)
@@ -514,7 +514,7 @@ func Insert[T comparable](pojo *T, qw *UpdateWrapper) int64 {
 func SelectCount4SQL(sql string, values ...interface{}) int {
 	count, err := gorm.G[int](globalDB).Raw(sql, values...).Find(context.Background())
 	if err != nil {
-		logger.Error("SelectCount4SQL failed: %v", err)
+		logger.Error("SelectCount4SQL failed: {}", err)
 		return 0
 	}
 	if len(count) == 0 {
@@ -525,7 +525,7 @@ func SelectCount4SQL(sql string, values ...interface{}) int {
 func SelectList4SQL[T comparable](sql string, values ...interface{}) []T {
 	result, err := gorm.G[T](globalDB).Raw(sql, values...).Find(context.Background())
 	if err != nil {
-		logger.Error("SelectList4SQL failed: %v", err)
+		logger.Error("SelectList4SQL failed: {}", err)
 		return result
 	}
 	return result
@@ -564,14 +564,14 @@ func Insert4SQL(qw *UpdateWrapper) (int64, int64) {
 	err := gorm.G[any](db, result).Exec(context.Background(), qw.baseSql, qw.values...)
 
 	if err != nil {
-		logger.Error("Insert4SQL failed: %v", err)
+		logger.Error("Insert4SQL failed: {}", err)
 		return 0, 0
 	}
 	count := result.RowsAffected
 	if qw.autoId {
 		lastId, err1 := result.Result.LastInsertId()
 		if err1 != nil {
-			logger.Error("Get LastInsertId failed: %v", err1)
+			logger.Error("Get LastInsertId failed: {}", err1)
 			return 0, 0
 		}
 		return count, lastId
@@ -622,7 +622,7 @@ func exec4SQL(qw *UpdateWrapper) int64 {
 	// Execute with parameters
 	err := gorm.G[any](db, result).Exec(context.Background(), qw.baseSql, qw.values...)
 	if err != nil {
-		logger.Error("EXEC SQL failed: %v", err)
+		logger.Error("EXEC SQL failed: {}", err)
 		return 0
 	}
 	return result.RowsAffected

@@ -150,9 +150,9 @@ func (qw *UpdateWrapper) removeFalseUpdates() *UpdateWrapper {
 // 查询sql组合器
 func (qw *QueryWrapper) queryWrapper4SQL() (string, []interface{}) {
 	baseSQL, values := getQuerySQLWithGroups(qw.query, qw.groups)
-	
+
 	// 不再移除开头的 " and "，因为查询会以 WHERE 1=1 开始
-	
+
 	if qw.sorts != nil || len(qw.sorts) > 0 {
 		sorts := qw.sorts
 		for i := 0; i < len(sorts); i++ {
@@ -218,7 +218,7 @@ func getGroupSQL(group *NestedQueryGroup) (string, []interface{}) {
 			if !criteria.condition {
 				continue
 			}
-			
+
 			var conditionSQL string
 			if criteria.actions == "BETWEEN" || criteria.actions == "NOT_IN" || criteria.actions == "IN" {
 				if criteria.actions == "BETWEEN" {
@@ -240,7 +240,7 @@ func getGroupSQL(group *NestedQueryGroup) (string, []interface{}) {
 			} else {
 				conditionSQL = fmt.Sprintf("%s %s ?", criteria.columns, getSqlKeyword(criteria.actions))
 			}
-			
+
 			if i == 0 {
 				groupSQL = conditionSQL
 			} else {
@@ -251,10 +251,10 @@ func getGroupSQL(group *NestedQueryGroup) (string, []interface{}) {
 				} else { // group.groupType == "OR"
 					connector = "OR"
 				}
-				
+
 				groupSQL = fmt.Sprintf("%s %s %s", groupSQL, connector, conditionSQL)
 			}
-			
+
 			// 添加值
 			for _, val := range criteria.values {
 				if criteria.actions != "IS_NULL" && criteria.actions != "IS_NOT_NULL" {
@@ -262,7 +262,7 @@ func getGroupSQL(group *NestedQueryGroup) (string, []interface{}) {
 				}
 			}
 		}
-		
+
 		sql = groupSQL
 	}
 
@@ -291,16 +291,16 @@ func getGroupSQL(group *NestedQueryGroup) (string, []interface{}) {
 func extractConditions(sql string) []string {
 	// 简单分割条件，基于 " and " 分割
 	conditions := []string{}
-	
+
 	// 使用状态机来正确解析SQL，避免在括号或字符串中分割
 	current := ""
 	inParentheses := 0
 	inQuotes := false
 	quoteChar := byte(0)
-	
+
 	for i := 0; i < len(sql); i++ {
 		char := sql[i]
-		
+
 		if inQuotes {
 			if char == quoteChar {
 				inQuotes = false
@@ -320,14 +320,14 @@ func extractConditions(sql string) []string {
 			i += 3 // skip "and "
 			continue
 		}
-		
+
 		current += string(char)
 	}
-	
+
 	if current != "" {
 		conditions = append(conditions, current)
 	}
-	
+
 	return conditions
 }
 
@@ -336,7 +336,7 @@ func joinParts(parts []string, separator string) string {
 	if len(parts) == 0 {
 		return ""
 	}
-	
+
 	result := parts[0]
 	for i := 1; i < len(parts); i++ {
 		result = fmt.Sprintf("%s %s %s", result, separator, parts[i])
@@ -348,7 +348,7 @@ func joinParts(parts []string, separator string) string {
 func getQuerySQLWithGroups(querys []queryCriteria, groups []*NestedQueryGroup) (string, []interface{}) {
 	baseSQL := ""
 	values := make([]interface{}, 0)
-	
+
 	if querys != nil && len(querys) > 0 {
 		for _, query := range querys {
 			if !query.condition {
@@ -394,7 +394,7 @@ func getQuerySQLWithGroups(querys []queryCriteria, groups []*NestedQueryGroup) (
 			}
 			for i := 0; i < len(query.values); i++ {
 				if query.actions == "IS_NULL" || query.actions == "IS_NOT_NULL" ||
-				   query.actions == "GROUP_AND" || query.actions == "GROUP_OR" {
+					query.actions == "GROUP_AND" || query.actions == "GROUP_OR" {
 					continue
 				}
 				values = append(values, query.values[i])
@@ -402,7 +402,7 @@ func getQuerySQLWithGroups(querys []queryCriteria, groups []*NestedQueryGroup) (
 
 		}
 	}
-	
+
 	// 处理嵌套查询组
 	for _, group := range groups {
 		groupSQL, groupValues := getGroupSQL(group)
@@ -411,7 +411,7 @@ func getQuerySQLWithGroups(querys []queryCriteria, groups []*NestedQueryGroup) (
 			if group.actions == "GROUP_OR" {
 				connector = "OR"
 			}
-			
+
 			// 如果基础查询不为空，则连接，否则直接赋值
 			if baseSQL != "" {
 				baseSQL = fmt.Sprintf("%s %s (%s)", baseSQL, connector, groupSQL)
@@ -422,10 +422,10 @@ func getQuerySQLWithGroups(querys []queryCriteria, groups []*NestedQueryGroup) (
 			values = append(values, groupValues...)
 		}
 	}
-	
+
 	// 不再移除开头的连接词，因为查询会以 WHERE 1=1 开始
 	// baseSQL = removeLeadingConnector(baseSQL)
-	
+
 	return baseSQL, values
 }
 
@@ -927,12 +927,6 @@ func addTableCache(tp string, name string, cacheName string) {
 	// return
 }
 
-func checkErr(err error) {
-	if err != nil {
-		logger.Info("database error: %v", err)
-	}
-}
-
 func saveLastInsertId(T interface{}, lastId int64) {
 	ref := reflect.ValueOf(T).Elem().Type()
 	idFieldName := ""
@@ -967,7 +961,7 @@ func saveLastInsertId(T interface{}, lastId int64) {
 
 func LogInfo(methodName string, format string) {
 	if active_log {
-		logger.Info("[%s]: ==> %s", methodName, format)
+		logger.Info("[{}]: ==> {}", methodName, format)
 	}
 }
 
