@@ -30,26 +30,26 @@ func TestNestedQuery(t *testing.T) {
 	wrapper := mapper.BuilderQueryWrapper()
 	result := wrapper.Eq(true, "name", "jinzhu").
 		Eq(true, "sex", 1).
-		//And(
-		//	mapper.NewAndGroup().
-		//		Eq(true, "name", "jinzhu 2").
-		//		Eq(true, "age", 18),
-		//).
-		//And(
-		//	mapper.NewOrGroup().
-		//		Eq(true, "word1", "bbbb").
-		//		Eq(true, "word2", "aaa"),
-		//).
+		And(
+			mapper.NewAndGroup().
+				Eq(true, "name", "jinzhu 2").
+				Eq(true, "age", 18),
+		).
+		And(
+			mapper.NewOrGroup().
+				Eq(true, "word1", "bbbb").
+				Eq(true, "word2", "aaa"),
+		).
 		Or(
 			mapper.NewAndGroup().
 				Eq(true, "key1", "123").
 				Eq(true, "key2", 456),
+		).
+		Or(
+			mapper.NewOrGroup().
+				Eq(true, "key3", "789").
+				Eq(true, "key4", 666),
 		)
-	//Or(
-	//	mapper.NewOrGroup().
-	//		Eq(true, "key3", "789").
-	//		Eq(true, "key4", 666),
-	//)
 
 	// 生成SQL（这会调用queryWrapper4SQL）
 	sql, values := result.GetSQLAndParams()

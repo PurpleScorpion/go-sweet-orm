@@ -54,3 +54,24 @@ func TestSelectList3(t *testing.T) {
 	)
 	logger.Info("查询指定ids的 user: {}", users)
 }
+
+func TestSelectPage(t *testing.T) {
+	registerDemo()
+	//pageUtils := mapper.BuilderPageUtils(1, 2, mapper.BuilderQueryWrapper())
+	//page := mapper.Page[user](pageUtils)
+	page := mapper.Page[user](
+		mapper.BuilderPageUtils(1, 2,
+			mapper.BuilderQueryWrapper(),
+		),
+	)
+
+	logger.Info("当前页: {}", page.Current)
+	logger.Info("总页数: {}", page.TotalPage)
+	logger.Info("总记录数: {}", page.TotalCount)
+
+	list := page.List
+	for _, u := range list {
+		logger.Info("姓名: {} , 年龄: {}", u.UserName, u.Age)
+	}
+
+}

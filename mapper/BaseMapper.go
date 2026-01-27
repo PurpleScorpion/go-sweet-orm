@@ -12,22 +12,21 @@ import (
 type BaseMapper struct {
 }
 
-func Page[T comparable](page PageUtils) PageData {
+func Page[T any](page *PageUtils) PageData[T] {
 	qw := page.wrapper
-	offSet := page.getOffSet()
+
+	offset := page.getOffSet()
 	pageSize := page.getPageSize()
-	qw.lastSQL = fmt.Sprintf("limit %d,%d", offSet, pageSize)
+
+	qw.lastSQL = fmt.Sprintf("limit %d,%d", offset, pageSize)
 	list := SelectList[T](qw)
+
 	qw.lastSQL = ""
 	count := SelectCount[T](qw)
+
 	page.setTotalSize(int64(count))
 
-	resList := make([]interface{}, len(list))
-	for i := 0; i < len(list); i++ {
-		resList[i] = list[i]
-	}
-	pageData := page.pageData(resList)
-	return pageData
+	return buildPageData(page, list)
 }
 
 /**
@@ -36,7 +35,7 @@ func Page[T comparable](page PageUtils) PageData {
  * 1. 当传入为对象类型时, 会将结果集封装为一个对象(不推荐,因为go的空值没有null这个结果,只能判断id是否为0)
  * 2. 当传入对象为数组类型时 , 会将结果集封装为一个数组(推荐,可以通过判断数组length是否为0来判断是否存在数据)
  */
-func SelectById[T comparable](id interface{}) []T {
+func SelectById[T any](id interface{}) []T {
 	var zero T
 	idFieldName := getTableId(zero)
 	if idFieldName == "null" {
@@ -65,7 +64,7 @@ func SelectById[T comparable](id interface{}) []T {
 	return result
 }
 
-func SelectList[T comparable](qw *QueryWrapper) []T {
+func SelectList[T any](qw *QueryWrapper) []T {
 
 	if qw == nil {
 		logger.Error("SelectList failed: QueryWrapper is nil")
@@ -92,11 +91,10 @@ func SelectList[T comparable](qw *QueryWrapper) []T {
 	return result
 }
 
-func SelectCount[T comparable](qw *QueryWrapper) int {
+func SelectCount[T any](qw *QueryWrapper) int {
 
 	if qw == nil {
-		logger.Error("SelectCount failed: QueryWrapper is nil")
-		return 0
+		qw = BuilderQueryWrapper()
 	}
 
 	var zero T
@@ -123,7 +121,7 @@ func SelectCount[T comparable](qw *QueryWrapper) int {
 	return count[0]
 }
 
-func Delete[T comparable](qw *UpdateWrapper) int64 {
+func Delete[T any](qw *UpdateWrapper) int64 {
 
 	if qw == nil {
 		logger.Error("Delete failed: UpdateWrapper is nil")
@@ -163,7 +161,7 @@ func Delete[T comparable](qw *UpdateWrapper) int64 {
 	return result.RowsAffected
 }
 
-func DeleteByIds[T comparable](ids interface{}, qw *UpdateWrapper) int64 {
+func DeleteByIds[T any](ids interface{}, qw *UpdateWrapper) int64 {
 
 	if qw == nil {
 		qw = BuilderUpdateWrapper(false)
@@ -215,7 +213,7 @@ func DeleteByIds[T comparable](ids interface{}, qw *UpdateWrapper) int64 {
 }
 
 // 使用事务的删除
-func DeleteById[T comparable](id interface{}, qw *UpdateWrapper) int64 {
+func DeleteById[T any](id interface{}, qw *UpdateWrapper) int64 {
 
 	if qw == nil {
 		qw = BuilderUpdateWrapper(false)
@@ -251,7 +249,7 @@ func DeleteById[T comparable](id interface{}, qw *UpdateWrapper) int64 {
 	return result.RowsAffected
 }
 
-func Update[T comparable](qw *UpdateWrapper) int64 {
+func Update[T any](qw *UpdateWrapper) int64 {
 
 	if qw == nil {
 		logger.Error("Update failed: UpdateWrapper is nil")
@@ -327,11 +325,10 @@ func Update[T comparable](qw *UpdateWrapper) int64 {
 
 // 批量插入 - 可极大提高效率
 // bulk, 单次插入数量
-func InsertAll[T comparable](list []*T, qw *UpdateWrapper) int64 {
+func InsertAll[T any](list []*T, qw *UpdateWrapper) int64 {
 
 	if qw == nil {
-		logger.Error("InsertAll failed: UpdateWrapper is nil")
-		return 0
+		qw = BuilderUpdateWrapper(false)
 	}
 
 	bulk := 2000
@@ -432,7 +429,7 @@ func insertMulti(idFieldName, tableName string, params []interface{}, bulk int, 
 	return sum
 }
 
-func Insert[T comparable](pojo *T, qw *UpdateWrapper) int64 {
+func Insert[T any](pojo *T, qw *UpdateWrapper) int64 {
 
 	if qw == nil {
 		logger.Error("Insert failed: UpdateWrapper is nil")
@@ -522,7 +519,7 @@ func SelectCount4SQL(sql string, values ...interface{}) int {
 	}
 	return count[0]
 }
-func SelectList4SQL[T comparable](sql string, values ...interface{}) []T {
+func SelectList4SQL[T any](sql string, values ...interface{}) []T {
 	result, err := gorm.G[T](globalDB).Raw(sql, values...).Find(context.Background())
 	if err != nil {
 		logger.Error("SelectList4SQL failed: {}", err)

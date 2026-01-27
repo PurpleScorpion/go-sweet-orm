@@ -25,23 +25,24 @@ var (
 	Sqlite          = "sqlite3"
 	active_db       = ""
 	active_log      = false
+	globalAutoId    = true
 	dbActiveFlag    = false
 	globalDB        *gorm.DB
 	mysqlConf       = MySQLConf{}
 )
 
 type MySQLConf struct {
-	UserName     string
-	Password     string
-	DbName       string
-	Port         int
-	Host         string
-	Charset      string
-	Loc          string
-	MaxIdleConn  int
-	MaxOpenConn  int
-	TlsCertPool  *x509.CertPool
-	RegisterFlag bool
+	UserName     string         // 用户名
+	Password     string         // 密码
+	DbName       string         // 数据库名称
+	Port         int            // 端口 不填默认3306
+	Host         string         // 数据库地址
+	Charset      string         // 字符集 不填默认 utf8mb4
+	Loc          string         // 时区 不填默认LOCAL
+	MaxIdleConn  int            // 最大空闲连接数 不填默认10
+	MaxOpenConn  int            // 最大连接数 不填默认100
+	TlsCertPool  *x509.CertPool // 若MYSQL需要证书,则需要配置根证书池
+	registerFlag bool
 }
 
 func SetMySqlConf(dbConf MySQLConf) {
@@ -77,9 +78,13 @@ func SetMySqlConf(dbConf MySQLConf) {
 	if dbConf.MaxOpenConn == 0 {
 		dbConf.MaxIdleConn = 100
 	}
-	dbConf.RegisterFlag = true
+	dbConf.registerFlag = true
 	mysqlConf = dbConf
 	active_db = MySQL
+}
+
+func CloseGlobalAutoId() {
+	globalAutoId = false
 }
 
 func ResisterSqlite(dbPath string) {
@@ -97,7 +102,7 @@ func ResisterSqlite(dbPath string) {
 }
 
 func RegisterMySql() {
-	if !mysqlConf.RegisterFlag {
+	if !mysqlConf.registerFlag {
 		panic("Please register mysql first")
 	}
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=%s&parseTime=True&loc=%s",

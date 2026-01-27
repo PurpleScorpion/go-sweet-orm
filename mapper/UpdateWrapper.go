@@ -27,6 +27,7 @@ func BuilderUpdateWrapper(flag bool) *UpdateWrapper {
 		wrapper.txFlag = flag
 		wrapper.txOrmer = globalDB.Begin()
 	}
+	wrapper.autoId = globalAutoId
 	return wrapper
 }
 
@@ -93,7 +94,11 @@ func (qw *UpdateWrapper) Rollback() error {
 	return nil
 }
 
-func (qw *UpdateWrapper) AutoId() *UpdateWrapper {
+func (qw *UpdateWrapper) CloseAutoId() *UpdateWrapper {
+	qw.autoId = false
+	return qw
+}
+func (qw *UpdateWrapper) OpenAutoId() *UpdateWrapper {
 	qw.autoId = true
 	return qw
 }
@@ -131,7 +136,7 @@ func (qw *UpdateWrapper) And(group *QueryWrapper) *UpdateWrapper {
 	if group.groupType != "" {
 		groupType = group.groupType
 	}
-	
+
 	groupContainer := &NestedQueryGroup{
 		groupType: groupType,
 		criteria:  group.query,
@@ -153,7 +158,7 @@ func (qw *UpdateWrapper) Or(group *QueryWrapper) *UpdateWrapper {
 	if group.groupType != "" {
 		groupType = group.groupType
 	}
-	
+
 	groupContainer := &NestedQueryGroup{
 		groupType: groupType,
 		criteria:  group.query,

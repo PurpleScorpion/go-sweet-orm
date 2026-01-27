@@ -8,8 +8,12 @@ type PageUtils struct {
 	wrapper   *QueryWrapper // 条件查询器
 }
 
-func BuilderPageUtils(thisPage int32, pageSize int32, wrapper *QueryWrapper) PageUtils {
-	return PageUtils{thisPage: thisPage, pageSize: pageSize, wrapper: wrapper}
+func BuilderPageUtils(thisPage int32, pageSize int32, wrapper *QueryWrapper) *PageUtils {
+	var pageUtils = &PageUtils{}
+	pageUtils.thisPage = thisPage
+	pageUtils.pageSize = pageSize
+	pageUtils.wrapper = wrapper
+	return pageUtils
 }
 
 func (p *PageUtils) getPageSize() int32 {
@@ -51,6 +55,12 @@ func (p *PageUtils) getTotalPage() int32 {
 	return int32(totalPage)
 }
 
-func (p *PageUtils) pageData(resList []interface{}) PageData {
-	return builderPageData(p.getThisPage(), p.getPageSize(), p.totalSize, p.getTotalPage(), resList)
+func buildPageData[T any](p *PageUtils, resList []T) PageData[T] {
+	return builderPageData(
+		p.getThisPage(),
+		p.getPageSize(),
+		p.totalSize,
+		p.getTotalPage(),
+		resList,
+	)
 }
