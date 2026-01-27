@@ -432,8 +432,7 @@ func insertMulti(idFieldName, tableName string, params []interface{}, bulk int, 
 func Insert[T any](pojo *T, qw *UpdateWrapper) int64 {
 
 	if qw == nil {
-		logger.Error("Insert failed: UpdateWrapper is nil")
-		return 0
+		qw = BuilderUpdateWrapper(false)
 	}
 
 	idFieldName := getTableId(pojo)
