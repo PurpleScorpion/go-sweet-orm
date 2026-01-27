@@ -10,6 +10,7 @@ type UpdateWrapper struct {
 	object       interface{}
 	query        []queryCriteria
 	updates      []updateSet
+	groups       []*NestedQueryGroup // 添加嵌套查询组支持
 	lastSQL      string
 	txOrmer      *gorm.DB
 	txFlag       bool
@@ -116,6 +117,50 @@ func (qw *UpdateWrapper) SetExcludeField(excludeField ...string) *UpdateWrapper 
 func (qw *UpdateWrapper) Set(flag bool, column string, value interface{}) *UpdateWrapper {
 	checkParma(value)
 	qw.updates = append(qw.updates, updateSet{condition: flag, columns: column, values: value})
+	return qw
+}
+
+// 添加And方法以支持嵌套查询
+func (qw *UpdateWrapper) And(group *QueryWrapper) *UpdateWrapper {
+	if group == nil || (len(group.query) == 0 && len(group.groups) == 0) {
+		return qw
+	}
+
+	// Create a nested group - use the group's own type if defined, otherwise default to AND
+	groupType := "AND"
+	if group.groupType != "" {
+		groupType = group.groupType
+	}
+	
+	groupContainer := &NestedQueryGroup{
+		groupType: groupType,
+		criteria:  group.query,
+		groups:    group.groups,
+		actions:   "GROUP_AND",
+	}
+	qw.groups = append(qw.groups, groupContainer)
+	return qw
+}
+
+// 添加Or方法以支持嵌套查询
+func (qw *UpdateWrapper) Or(group *QueryWrapper) *UpdateWrapper {
+	if group == nil || (len(group.query) == 0 && len(group.groups) == 0) {
+		return qw
+	}
+
+	// Create a nested group - use the group's own type if defined, otherwise default to OR
+	groupType := "OR"
+	if group.groupType != "" {
+		groupType = group.groupType
+	}
+	
+	groupContainer := &NestedQueryGroup{
+		groupType: groupType,
+		criteria:  group.query,
+		groups:    group.groups,
+		actions:   "GROUP_OR",
+	}
+	qw.groups = append(qw.groups, groupContainer)
 	return qw
 }
 

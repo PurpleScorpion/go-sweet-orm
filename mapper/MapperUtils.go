@@ -149,7 +149,10 @@ func (qw *UpdateWrapper) removeFalseUpdates() *UpdateWrapper {
 
 // 查询sql组合器
 func (qw *QueryWrapper) queryWrapper4SQL() (string, []interface{}) {
-	baseSQL, values := getQuerySQL(qw.query)
+	baseSQL, values := getQuerySQLWithGroups(qw.query, qw.groups)
+	
+	// 不再移除开头的 " and "，因为查询会以 WHERE 1=1 开始
+	
 	if qw.sorts != nil || len(qw.sorts) > 0 {
 		sorts := qw.sorts
 		for i := 0; i < len(sorts); i++ {
@@ -178,6 +181,251 @@ func (qw *QueryWrapper) queryWrapper4SQL() (string, []interface{}) {
 		baseSQL = fmt.Sprintf("%s %s", baseSQL, qw.lastSQL)
 	}
 
+	return baseSQL, values
+}
+
+// 移除SQL开头的连接词 - 保留此函数供其他地方使用，但不在queryWrapper4SQL中使用
+func removeLeadingConnector(sql string) string {
+	if len(sql) >= 5 && sql[:5] == " and " {
+		return sql[5:]
+	}
+	if len(sql) >= 4 && sql[:4] == "or " {
+		return sql[3:] // 移除 "or "
+	}
+	if len(sql) >= 5 && sql[:5] == " AND " {
+		return sql[4:] // 移除 " AND "
+	}
+	if len(sql) >= 4 && sql[:4] == " OR " {
+		return sql[3:] // 移除 " OR "
+	}
+	return sql
+}
+
+// 生成嵌套查询组的SQL
+func getGroupSQL(group *NestedQueryGroup) (string, []interface{}) {
+	if group == nil {
+		return "", nil
+	}
+
+	var sql string
+	var values []interface{}
+
+	// 处理组内的普通条件
+	if len(group.criteria) > 0 {
+		// 为组内条件单独构建SQL，不经过外部的getQuerySQL处理
+		var groupSQL string
+		for i, criteria := range group.criteria {
+			if !criteria.condition {
+				continue
+			}
+			
+			var conditionSQL string
+			if criteria.actions == "BETWEEN" || criteria.actions == "NOT_IN" || criteria.actions == "IN" {
+				if criteria.actions == "BETWEEN" {
+					conditionSQL = fmt.Sprintf("%s BETWEEN ? AND ?", criteria.columns)
+				} else {
+					str := "("
+					for j := 0; j < len(criteria.values); j++ {
+						if j == len(criteria.values)-1 {
+							str += "?"
+						} else {
+							str += "?,"
+						}
+					}
+					str += ")"
+					conditionSQL = fmt.Sprintf("%s %s %s", criteria.columns, getSqlKeyword(criteria.actions), str)
+				}
+			} else if criteria.actions == "IS_NULL" || criteria.actions == "IS_NOT_NULL" {
+				conditionSQL = fmt.Sprintf("%s %s", criteria.columns, getSqlKeyword(criteria.actions))
+			} else {
+				conditionSQL = fmt.Sprintf("%s %s ?", criteria.columns, getSqlKeyword(criteria.actions))
+			}
+			
+			if i == 0 {
+				groupSQL = conditionSQL
+			} else {
+				// 根据用户期望：AND组内部使用AND，OR组内部使用OR
+				var connector string
+				if group.groupType == "AND" {
+					connector = "AND"
+				} else { // group.groupType == "OR"
+					connector = "OR"
+				}
+				
+				groupSQL = fmt.Sprintf("%s %s %s", groupSQL, connector, conditionSQL)
+			}
+			
+			// 添加值
+			for _, val := range criteria.values {
+				if criteria.actions != "IS_NULL" && criteria.actions != "IS_NOT_NULL" {
+					values = append(values, val)
+				}
+			}
+		}
+		
+		sql = groupSQL
+	}
+
+	// 处理嵌套的子组
+	for _, subGroup := range group.groups {
+		subGroupSQL, subGroupValues := getGroupSQL(subGroup)
+		if subGroupSQL != "" {
+			// 添加连接词
+			if sql != "" {
+				connector := "AND"
+				if group.groupType == "OR" {
+					connector = "OR"
+				}
+				sql = fmt.Sprintf("%s %s (%s)", sql, connector, subGroupSQL)
+			} else {
+				sql = fmt.Sprintf("(%s)", subGroupSQL)
+			}
+			values = append(values, subGroupValues...)
+		}
+	}
+
+	return sql, values
+}
+
+// 提取SQL中的条件部分
+func extractConditions(sql string) []string {
+	// 简单分割条件，基于 " and " 分割
+	conditions := []string{}
+	
+	// 使用状态机来正确解析SQL，避免在括号或字符串中分割
+	current := ""
+	inParentheses := 0
+	inQuotes := false
+	quoteChar := byte(0)
+	
+	for i := 0; i < len(sql); i++ {
+		char := sql[i]
+		
+		if inQuotes {
+			if char == quoteChar {
+				inQuotes = false
+			}
+		} else if (char == '\'' || char == '"') && i > 0 && sql[i-1] != '\\' {
+			inQuotes = true
+			quoteChar = char
+		} else if char == '(' {
+			inParentheses++
+		} else if char == ')' {
+			inParentheses--
+		} else if inParentheses == 0 && i+4 < len(sql) && sql[i:i+4] == " and " {
+			if current != "" {
+				conditions = append(conditions, current)
+				current = ""
+			}
+			i += 3 // skip "and "
+			continue
+		}
+		
+		current += string(char)
+	}
+	
+	if current != "" {
+		conditions = append(conditions, current)
+	}
+	
+	return conditions
+}
+
+// 连接SQL片段
+func joinParts(parts []string, separator string) string {
+	if len(parts) == 0 {
+		return ""
+	}
+	
+	result := parts[0]
+	for i := 1; i < len(parts); i++ {
+		result = fmt.Sprintf("%s %s %s", result, separator, parts[i])
+	}
+	return result
+}
+
+// 查询sql组合器，同时处理普通查询条件和嵌套组
+func getQuerySQLWithGroups(querys []queryCriteria, groups []*NestedQueryGroup) (string, []interface{}) {
+	baseSQL := ""
+	values := make([]interface{}, 0)
+	
+	if querys != nil && len(querys) > 0 {
+		for _, query := range querys {
+			if !query.condition {
+				continue
+			}
+			if query.actions == "BETWEEN" || query.actions == "NOT_IN" || query.actions == "IN" {
+				if query.actions == "BETWEEN" {
+					baseSQL = fmt.Sprintf("%s and %s BETWEEN ? AND ? ", baseSQL, query.columns)
+				} else {
+					str := "("
+					for i := 0; i < len(query.values); i++ {
+						if i == len(query.values)-1 {
+							str += "?"
+						} else {
+							str += "?,"
+						}
+					}
+					str += ")"
+
+					baseSQL = fmt.Sprintf("%s and %s %s %s ", baseSQL, query.columns, getSqlKeyword(query.actions), str)
+				}
+
+			} else if query.actions == "GROUP_AND" || query.actions == "GROUP_OR" {
+				// 处理嵌套查询组
+				if group, ok := query.values[0].(*NestedQueryGroup); ok {
+					groupSQL, groupValues := getGroupSQL(group)
+					if groupSQL != "" {
+						connector := "AND"
+						if query.actions == "GROUP_OR" {
+							connector = "OR"
+						}
+						baseSQL = fmt.Sprintf("%s %s (%s)", baseSQL, connector, groupSQL)
+						values = append(values, groupValues...)
+					}
+				}
+			} else {
+				if query.actions == "IS_NULL" || query.actions == "IS_NOT_NULL" {
+					baseSQL = fmt.Sprintf("%s and %s %s ", baseSQL, query.columns, getSqlKeyword(query.actions))
+				} else {
+					baseSQL = fmt.Sprintf("%s and %s %s ? ", baseSQL, query.columns, getSqlKeyword(query.actions))
+				}
+
+			}
+			for i := 0; i < len(query.values); i++ {
+				if query.actions == "IS_NULL" || query.actions == "IS_NOT_NULL" ||
+				   query.actions == "GROUP_AND" || query.actions == "GROUP_OR" {
+					continue
+				}
+				values = append(values, query.values[i])
+			}
+
+		}
+	}
+	
+	// 处理嵌套查询组
+	for _, group := range groups {
+		groupSQL, groupValues := getGroupSQL(group)
+		if groupSQL != "" {
+			connector := "AND"
+			if group.actions == "GROUP_OR" {
+				connector = "OR"
+			}
+			
+			// 如果基础查询不为空，则连接，否则直接赋值
+			if baseSQL != "" {
+				baseSQL = fmt.Sprintf("%s %s (%s)", baseSQL, connector, groupSQL)
+			} else {
+				// 如果基础SQL为空，但这是OR类型的组，需要特殊处理
+				baseSQL = fmt.Sprintf("(%s)", groupSQL)
+			}
+			values = append(values, groupValues...)
+		}
+	}
+	
+	// 不再移除开头的连接词，因为查询会以 WHERE 1=1 开始
+	// baseSQL = removeLeadingConnector(baseSQL)
+	
 	return baseSQL, values
 }
 
@@ -728,4 +976,19 @@ func isSlice(obj interface{}) bool {
 	kind := value.Kind()
 
 	return kind == reflect.Slice
+}
+
+// 添加一个公共方法来获取生成的SQL和参数，方便调试
+func (qw *QueryWrapper) GetSQLAndParams() (string, []interface{}) {
+	return qw.queryWrapper4SQL()
+}
+
+// 添加一个公共方法到UpdateWrapper
+func (uw *UpdateWrapper) GetSQLAndParams() (string, []interface{}) {
+	// 组合普通查询条件和嵌套组
+	baseSQL, values := getQuerySQLWithGroups(uw.query, uw.groups)
+	if !isEmpty(uw.lastSQL) {
+		baseSQL = fmt.Sprintf("%s %s", baseSQL, uw.lastSQL)
+	}
+	return baseSQL, values
 }

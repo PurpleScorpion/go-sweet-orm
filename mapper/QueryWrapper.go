@@ -9,8 +9,10 @@ import (
 type QueryWrapper struct {
 	resList interface{}
 	query   []queryCriteria
+	groups  []*NestedQueryGroup // 支持嵌套查询组
 	sorts   []querySort
 	lastSQL string
+	groupType string // 用于标记这是一个AND组还是OR组，用于内部连接符
 }
 
 type queryCriteria struct {
@@ -18,6 +20,14 @@ type queryCriteria struct {
 	columns   string
 	values    []interface{}
 	actions   string
+}
+
+// NestedQueryGroup represents a group of nested query conditions
+type NestedQueryGroup struct {
+	groupType string              // "AND" or "OR"
+	criteria  []queryCriteria     // individual criteria in this group
+	groups    []*NestedQueryGroup // nested groups inside this group
+	actions   string              // "GROUP_AND" or "GROUP_OR"
 }
 
 type updateSet struct {
@@ -46,6 +56,65 @@ type querySort struct {
 func BuilderQueryWrapper() *QueryWrapper {
 	wrapper := &QueryWrapper{}
 	return wrapper
+}
+
+// 为内部创建使用的新构造函数
+func newQueryGroup(groupType string) *QueryWrapper {
+	return &QueryWrapper{
+		groupType: groupType,
+	}
+}
+
+// NewAndGroup creates a new AND group for nested queries
+func NewAndGroup() *QueryWrapper {
+	return newQueryGroup("AND")
+}
+
+// NewOrGroup creates a new OR group for nested queries
+func NewOrGroup() *QueryWrapper {
+	return newQueryGroup("OR")
+}
+
+func (qw *QueryWrapper) And(group *QueryWrapper) *QueryWrapper {
+	if group == nil || (len(group.query) == 0 && len(group.groups) == 0) {
+		return qw
+	}
+
+	// Create a nested group - use the group's own type if defined, otherwise default to AND
+	groupType := "AND"
+	if group.groupType != "" {
+		groupType = group.groupType
+	}
+	
+	groupContainer := &NestedQueryGroup{
+		groupType: groupType,
+		criteria:  group.query,
+		groups:    group.groups,
+		actions:   "GROUP_AND",
+	}
+	qw.groups = append(qw.groups, groupContainer)
+	return qw
+}
+
+func (qw *QueryWrapper) Or(group *QueryWrapper) *QueryWrapper {
+	if group == nil || (len(group.query) == 0 && len(group.groups) == 0) {
+		return qw
+	}
+
+	// Create a nested group - use the group's own type if defined, otherwise default to OR
+	groupType := "OR"
+	if group.groupType != "" {
+		groupType = group.groupType
+	}
+	
+	groupContainer := &NestedQueryGroup{
+		groupType: groupType,
+		criteria:  group.query,
+		groups:    group.groups,
+		actions:   "GROUP_OR",
+	}
+	qw.groups = append(qw.groups, groupContainer)
+	return qw
 }
 
 func (qw *QueryWrapper) Eq(flag bool, column string, value interface{}) *QueryWrapper {
