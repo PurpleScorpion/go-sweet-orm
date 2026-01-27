@@ -18,119 +18,141 @@
    ```
  - 2 注册数据库连接
      ```text
-     mapper.SetMySqlConf()
-     mapper.Register(activeDB, connStr string, params ...int)  
-         activeDB: 激活的数据库, 目前仅支持 mapper.MySQL 和 mapper.Sqlite
-         connStr: 数据库连接字符串 (注意mysql是包含用户名密码的连接字符串, 但是Sqlite却是文件地址)
-             mysql连接字符串: connStr := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8&parseTime=true&loc=Local", username, password, host, port, dbName) 
-         params: 可变参数, 但是目前仅前两个参数有效 , 可选项, 第一个为MaxIdleConns(默认50) , 第二个为MaxOpenConns(默认100) 
-       
-     使用示例:
-       connStr := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8&parseTime=true&loc=Local", username, password, host, port, dbName) 
-       mapper.Register(mapper.MySQL, connStr)
+     mapper.SetMySqlConf(mapper.MySQLConf{
+        UserName: "root",
+        Password: "root",
+        DbName:   "demo",
+        Port:     3308,
+        Host:     "localhost",
+    })
+    mapper.RegisterMySql()
+    
+    配置项如下所示
+    type MySQLConf struct {
+        UserName     string // 用户名
+        Password     string // 密码
+        DbName       string // 数据库名称
+        Port         int   // 端口 不填默认3306
+        Host         string // 数据库地址
+        Charset      string // 字符集 不填默认 utf8mb4
+        Loc          string // 时区 不填默认LOCAL
+        MaxIdleConn  int // 最大空闲连接数 不填默认10
+        MaxOpenConn  int // 最大连接数 不填默认100
+        TlsCertPool  *x509.CertPool // 若MYSQL需要证书,则需要配置根证书池
+    } 
+    若你的MySQL需要证书,则需要配置根证书池
+    rootCertPool := x509.NewCertPool()
+	pem, _ := ioutil.ReadFile("你的根证书路径")
+	if ok := rootCertPool.AppendCertsFromPEM(pem); !ok {
+		panic("Failed to append PEM.")
+	}
+   
      ```
  - 3 Wrapper介绍
    - 3.1 QueryWrapper
    ```text
     1. 创建查询器 
-    var log []Logs
-    qw := mapper.BuilderQueryWrapper(&log)
-    注意, 此处必须使用指针参数 , 否则无法将结果映射到entity中
+    qw := mapper.BuilderQueryWrapper()
     2. 具体函数: 请查看 <5 查询器函数介绍>
    ```
    - 3.2 UpdateWrapper
    ```text
     1. 创建更新器(用于增删改)
-        更新器大部分都可以使用匿名对象的形式进行传参, 但是执行Insert的时候必须传入指针对象, 否则若是自增ID则无法回填到entity中
-        第二个参数其实是个可变参数 , 但是此处只接受1个参数, 该参数的作用是是否开启事务, 默认为false(不开启)
-    2. 新增示例(构造器-无事务)
-        var log Logs
-        log.Title = "test"
-        qw := mapper.BuilderUpdateWrapper(&log)
-        qw.Insert()
-    3. 新增示例(构造器-开启事务)
-        var log Logs
-        log.Title = "test"
-        qw := mapper.BuilderUpdateWrapper(&log,true)
-        count := qw.Insert()
-        if (count == 0){
-            qw.Rollback()
-        }else {
-            qw.Commit()
-        }
-    4. 新增示例(便捷插入-永无事务)
-        var log Logs
-        log.Title = "test"
-        mapper.Insert(&log)
-    5. 新增示例(构造器-批量插入)
-        具体使用查看 Demo_test.go 下的 TestDemo1() 测试用例
-    6. 删除示例(构造器-无事务)
-        具体使用查看 Demo.go 下的 demo8() 测试用例
-    7. 删除示例(构造器-开启事务)
-        以此类推即可....
-    8. 删除示例(根据ID删除)
-        具体使用查看 Demo.go 下的 demo7() 测试用例
-    9. 删除示例(根据ID批量删除)
-        具体使用查看 Demo.go 下的 demo7_1() 测试用例
-    10. 删除示例(根据ID批量删除-便捷使用)
-        具体使用查看 Demo.go 下的 demo7_2() 测试用例
-    11. 修改示例(构造器-无事务)
-        以此类推即可....
-    12. 修改示例(构造器-开启事务)
-        以此类推即可....
+        详细使用请参考 
+            [DeleteDemo_test.go](demo/DeleteDemo_test.go)
+            [InsertDemo_test.go](demo/InsertDemo_test.go)
+            [UpdateDemo_test.go](demo/UpdateDemo_test.go)
+        实际使用方式与mybatis-plus类似
+    2. 构造器-无事务
+        wrapper := mapper.BuilderUpdateWrapper(false)
+    3. 构造器-开启事务
+        wrapper := mapper.BuilderUpdateWrapper(true)
+        
+    
    ```
  - 5 其他函数
    ```text
-    SelectById(entity,id) 无返回值 , 查到的结果会直接映射到entity中
-        根据id查询,传入的entity可以是单个对象,也可以是一个数组,但是建议使用数组
-    QueryWrapper的使用请看2.1
-    SelectList(QueryWrapper) 无返回值 , 查到的结果会直接映射到entity中
-        根据QueryWrapper条件来查询数据列表
-    SelectCount(QueryWrapper) 返回值为int64
-        根据QueryWrapper条件来查询数据数量
-    SelectList4SQL(entity,sql,values...) 无返回值 , 查到的结果会直接映射到entity中
+    SelectById[泛型](id) []泛型 , 
+        根据id查询,返回泛型数组(为了避免差不到报错的问题 , 直接返回一个数组)
+   
+    SelectList[泛型](QueryWrapper) []泛型 ,
+        根据QueryWrapper条件来查询数据列表 , 为了避免遍历表中的所有数据造成事故 , 这里限制了QueryWrapper不能为nil
+   
+    SelectCount(QueryWrapper) 返回值为int
+        根据QueryWrapper条件来查询数据数量,若想查表中数量 , 参数可以传递nil
+   
+    SelectList4SQL[泛型](,sql,values...) []泛型
         使用原生sql查询数据列表,values是可变参数列表,用来替换`?`占位符
         若不理解什么是`?`占位符,请先去学习java jdbc
-    SelectCount4SQL(entity,sql,values...) 返回值为int64
+   
+    SelectCount4SQL(sql,values...) 返回值为int
         使用原生sql查询数据数量,values是可变参数列表,用来替换`?`占位符
-    Update(QueryWrapper) 返回值为int64 (更新影响的行数)
-        根据QueryWrapper条件来更新数据
-        注意此时QueryWrapper必须使用Set函数进行设置待更新的字段,否则会抛出异常
-    Update4SQL(sql,values...) 返回值为int64 (更新影响的行数)
+   
+    Update[泛型](UpdateWrapper) 返回值为int64 (更新影响的行数)
+        根据UpdateWrapper条件来更新数据
+        注意此时UpdateWrapper必须使用Set函数进行设置待更新的字段,否则会抛出异常
+   
+    Update4SQL(UpdateWrapper) 返回值为int64 (更新影响的行数)
+        需调用函数 wrapper.SQL(sql,values...)
         原生sql进行更新
         sql: 原生sql
         values... : 可变参数, 用于替换 `?` 占位符
-    DeleteById(entity,id) 返回值为int64 (删除影响的行数)
-        根据id删除,传入的entity必须是单个对象,不可以是数组
-    Delete(QueryWrapper) 返回值为int64 (删除影响的行数)
-        根据QueryWrapper条件来删除数据
-    Delete4SQL(sql,values...) 返回值为int64 (删除影响的行数)
-        原生sql进行删除
+   
+    DeleteById[泛型](id,UpdateWrapper) 返回值为int64 (删除影响的行数)
+        根据id删除,UpdateWrapper可传nil , 有UpdateWrapper的目的是为了开启事务
+   
+    Delete[泛型](UpdateWrapper) 返回值为int64 (删除影响的行数)
+        根据UpdateWrapper条件来删除数据
+   
+    Delete4SQL(UpdateWrapper) 返回值为int64 (删除影响的行数)
+        需调用函数 wrapper.SQL(sql,values...)
+        原生sql进行更新
         sql: 原生sql
         values... : 可变参数, 用于替换 `?` 占位符
-    Insert(entity,excludeField...) 返回值为int64 (新增影响的行数)
-        根据传入实体类中的值进行新增 , 新增后该对象中会有新增后的id
-        默认自增主键 , 空值排除(若为0或""等空值,则默认不向数据库中添加该值)
-        excludeField为可变参数列表,传入的值为新增时忽视的字段
-    InsertCustom(entity,autoId,excludeEmpty,excludeField...) 返回值为int64 (新增影响的行数)
-        根据传入实体类中的值进行新增 若autoId为true 则新增后该对象中会有新增后的id
-        autoId: 是否为自增主键 true:自增主键/false:自定义主键
-        excludeEmpty: 是否进行空值排除 true:空值排除/false:空值仍然存储
-        excludeField为可变参数列表,传入的值为新增时忽视的字段
-    Insert4SQL(autoId,sql,values...) 返回值2个
+   
+    Insert[泛型](&entity,UpdateWrapper) 返回值为int64 (新增影响的行数)
+        UpdateWrapper可为nil
+        wrapper.SetExcludeEmpty(true/false) 用来设置是否排除空值, true:排除 (int: 0,string: "")这种空值 , 默认false
+        wrapper.SetExcludeField(excludeField ...string) 用来设置是否的字段 , 可多次调用
+        其中默认自增,若不想使用自增, 请使用wrapper.CloseAutoId()
+        若嫌太麻烦 , 则可以使用mapper.CloseGlobalAutoId() , 这样全局都不会出现自增ID
+        当然 , 若有个别的表是AutoId, 则可以使用wrapper.OpenAutoId() , 对此次操作开启
+   
+    InsertAll[泛型](&entityList,UpdateWrapper) 返回值为int64 (新增影响的行数) 
+        UpdateWrapper可为nil
+   
+    Insert4SQL(UpdateWrapper) 返回值2个
         原生sql插入数据方式
-        autoId: 是否是自增主键 true: 自增主键,返回值将返回插入后的自增主键值 / false: 不是自增主键,返回值中的自增主键值为0
+        需调用函数 wrapper.SQL(sql,values...)
         sql: 原生sql
         values... : 可变参数, 用于替换 `?` 占位符
+        其中autoId受UpdateWrapper影响
+   
         返回值1: 影响的行数
         返回值2: 插入后的自增主键值 , 受autoId参数影响
-    Page(PageUtils) 分页工具 返回值为PageData对象
-        若想使用分页工具,必须按以下流程进行编写代码
-        1. 创建结果集 var resLog []Logs 必须: 必须是数组类型
-        2. 创建查询器 qw := mapper.BuilderQueryWrapper(&resLog)
-        3. 创建分页器 page := mapper.BuilderPageUtils(thisPage, pageSize, qw)
-        4. 调用方法进行分页查询 pageData := mapper.Page(page) 必须: 必须接收返回值
-            注: 可自行修改 PageData 类中的builder函数和Field来完成符合自己需求的分页结果集
+   
+   
+    Page[泛型](PageUtils) 分页工具 返回值为PageData对象
+        两种使用方式 , 为了美观 , 可以选择被注释的方式
+        //pageUtils := mapper.BuilderPageUtils(1, 2, mapper.BuilderQueryWrapper())
+	    //page := mapper.Page[user](pageUtils)
+   
+	    page := mapper.Page[user](
+		    mapper.BuilderPageUtils(1, 2, 
+			    mapper.BuilderQueryWrapper(),
+		    ),
+	    )
+
+	    logger.Info("当前页: {}", page.Current)
+	    logger.Info("总页数: {}", page.TotalPage)
+	    logger.Info("总记录数: {}", page.TotalCount)
+
+	    list := page.List
+	    for _, u := range list {
+		    logger.Info("姓名: {} , 年龄: {}", u.UserName, u.Age)
+	    }    
+   
+   
    ```
 - 6 查询器函数介绍
      - 如果你熟悉Java中的MyBatis的QueryWrapper,那本教程你将会很轻松
@@ -189,9 +211,7 @@
            - 参数3: value, 更新的值
  - 7 具体函数使用
    ```text
-    具体使用方式已在mapper.demo文件夹下
-    其中Logs.go为实体类文件
-    Demo.go是使用示例文件
+    具体使用方式已在demo文件夹下
    ```
  - 8 其他函数的使用
    - OpenLog() 开启日志
@@ -203,3 +223,37 @@
    - BenginTransaction() 开启事务
    - Commit() 提交事务
    - Rollback() 回滚事务
+ - 9 Add组与Or组使用
+  ```text
+
+        使用示例
+    func TestNestedQuery(t *testing.T) {
+        // 构建复杂嵌套查询
+        wrapper := mapper.BuilderQueryWrapper()
+        result := wrapper.Eq(true, "name", "jinzhu").
+            Eq(true, "sex", 1).
+            And(
+                mapper.NewAndGroup().
+                    Eq(true, "name", "jinzhu 2").
+                    Eq(true, "age", 18),
+            ).
+            And(
+                mapper.NewOrGroup().
+                    Eq(true, "word1", "bbbb").
+                    Eq(true, "word2", "aaa"),
+            ).
+            Or(
+                mapper.NewAndGroup().
+                    Eq(true, "key1", "123").
+                    Eq(true, "key2", 456),
+            ).
+            Or(
+                mapper.NewOrGroup().
+                    Eq(true, "key3", "789").
+                    Eq(true, "key4", 666),
+            )
+        
+        生成的sql语句如下所示
+        Generated SQL:  and name = ?  and sex = ?  AND (name = ? AND age = ?) AND (word1 = ? OR word2 = ?) OR (key1 = ? AND key2 = ?) OR (key3 = ? OR key4 = ?)
+    }
+```
