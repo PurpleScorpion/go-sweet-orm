@@ -1,10 +1,11 @@
 # go-sweet-orm
 
-## go的持久层框架 V2
+## go的持久层框架 V3
 
 ### 基础支持
  - gorm作为基础框架  (gorm.io/gorm v1.31.1)
  - 目前仅支持mysql和sqlite
+ - go版本1.25.6及以上
 ### 使用方式
 
  - 1 引入包 
