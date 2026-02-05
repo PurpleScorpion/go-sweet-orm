@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"runtime"
 	"strings"
 
 	"github.com/PurpleScorpion/go-sweet-orm/v3/logger"
@@ -469,7 +470,11 @@ func insertMulti(idFieldName, tableName string, params []interface{}, bulk int, 
 		db.Commit()
 		sum += result.RowsAffected
 	}
-
+	logger.Info("Batch insertion succeeded")
+	logger.Info("The estimated number of data entries to be inserted this time is [{}].", len(params))
+	logger.Info("Successfully inserted [{}] rows of data", sum)
+	runtime.GC()
+	logger.Info("Garbage collection successful")
 	return sum
 }
 
