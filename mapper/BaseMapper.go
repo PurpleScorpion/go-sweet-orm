@@ -363,72 +363,109 @@ func InsertAll[T any](list []T, qw *UpdateWrapper) int64 {
 }
 
 func insertMulti(idFieldName, tableName string, params []interface{}, bulk int, qw *UpdateWrapper) int64 {
+
 	sind := reflect.ValueOf(params)
-	fields, _, _ := getExcludeFiledName(sind.Index(0).Interface(), tableName, qw.excludeField, idFieldName, qw.excludeEmpty)
+	if sind.Len() == 0 {
+		return 0
+	}
+
+	// 取第一条数据，确定字段结构
+	fields, _, _ := getExcludeFiledName(
+		sind.Index(0).Interface(),
+		tableName,
+		qw.excludeField,
+		idFieldName,
+		qw.excludeEmpty,
+	)
 	if len(fields) == 0 {
 		panic("No fields were found")
 	}
 
-	sql1 := "("
-	for i := 0; i < len(fields); i++ {
-		if i == len(fields)-1 {
-			sql1 = fmt.Sprintf("%s %s", sql1, fields[i])
-		} else {
-			sql1 = fmt.Sprintf("%s %s, ", sql1, fields[i])
+	// =========================
+	// 1. 构建字段 SQL：( field1, field2, field3 )
+	// =========================
+	var colBuilder strings.Builder
+	colBuilder.WriteString("(")
+	for i, f := range fields {
+		colBuilder.WriteString(" ")
+		if i > 0 {
+			colBuilder.WriteString(", ")
 		}
+		colBuilder.WriteString(f)
 	}
-	sql1 = fmt.Sprintf("%s ) ", sql1)
-	endOffset := 1
-	if bulk > sind.Len() {
+	colBuilder.WriteString(" ) ")
+
+	sql1 := colBuilder.String()
+
+	// =========================
+	// 2. baseSQL
+	// =========================
+	baseSQL := "insert into " + tableName + " " + sql1 + " values "
+
+	// =========================
+	// 3. 生成单行占位符模板：(?, ?, ?)
+	// =========================
+	rowTpl := buildRowPlaceholder(len(fields))
+
+	// =========================
+	// 4. 计算批次数
+	// =========================
+	if bulk <= 0 {
 		bulk = sind.Len()
-	} else {
-		endOffset = (sind.Len() / bulk) + 1
 	}
-	baseSQL := fmt.Sprintf("insert into %s %s values ", tableName, sql1)
+
+	endOffset := (sind.Len() + bulk - 1) / bulk
+
 	var sum int64 = 0
-	// 遍历偏移量
+
+	// =========================
+	// 5. 分批插入
+	// =========================
 	for offset := 0; offset < endOffset; offset++ {
 		startIndex := offset * bulk
-		endIndex := offset*bulk + bulk
+		endIndex := startIndex + bulk
 		if endIndex > sind.Len() {
 			endIndex = sind.Len()
 		}
-		// 遍历所有数据
-		ss := ""
-		values := make([]interface{}, 0)
-		for i := startIndex; i < endIndex; i++ {
-			sql2 := "("
-			fs, vals, _ := getExcludeFiledName(sind.Index(i).Interface(), tableName, qw.excludeField, idFieldName, qw.excludeEmpty)
-			//遍历字段
-			for x := 0; x < len(fs); x++ {
 
-				if x == len(fs)-1 {
-					sql2 = fmt.Sprintf("%s ?", sql2)
-				} else {
-					sql2 = fmt.Sprintf("%s ?, ", sql2)
-				}
-			}
-			if i == endIndex-1 {
-				sql2 = fmt.Sprintf("%s ) ", sql2)
-			} else {
-				sql2 = fmt.Sprintf("%s ), ", sql2)
-			}
-			ss += sql2
+		rows := endIndex - startIndex
+		if rows <= 0 {
+			continue
+		}
+
+		// 5.1 构建多行占位符
+		valuesSQL := buildMultiRowPlaceholder(rowTpl, rows)
+
+		// 5.2 收集 values
+		values := make([]interface{}, 0, rows*len(fields))
+		for i := startIndex; i < endIndex; i++ {
+			_, vals, _ := getExcludeFiledName(
+				sind.Index(i).Interface(),
+				tableName,
+				qw.excludeField,
+				idFieldName,
+				qw.excludeEmpty,
+			)
 			values = append(values, vals...)
 		}
 
-		// 启动事务
+		// =========================
+		// 6. 执行 SQL（事务）
+		// =========================
 		db := globalDB.Begin()
-
 		result := gorm.WithResult()
-		// Execute with parameters
-		err := gorm.G[any](db, result).Exec(context.Background(), baseSQL+ss, values...)
+
+		err := gorm.G[any](db, result).
+			Exec(context.Background(), baseSQL+valuesSQL, values...)
+		LogInfo("InsertAll", fmt.Sprintf("Preparing: %v", baseSQL+valuesSQL))
+		LogInfo("InsertAll", fmt.Sprintf("Parameters: %v", values))
+
 		if err != nil {
 			logger.Error("Insert failed: {}", err)
-			//失败时回滚事务
 			db.Rollback()
 			return 0
 		}
+
 		db.Commit()
 		sum += result.RowsAffected
 	}
@@ -436,8 +473,42 @@ func insertMulti(idFieldName, tableName string, params []interface{}, bulk int, 
 	return sum
 }
 
-func Insert[T any](pojo *T, qw *UpdateWrapper) int64 {
+func buildMultiRowPlaceholder(rowTpl string, rows int) string {
+	if rows <= 0 {
+		return ""
+	}
 
+	var b strings.Builder
+	// 预估容量，避免多次扩容
+	b.Grow(len(rowTpl)*rows + (rows-1)*2)
+
+	for i := 0; i < rows; i++ {
+		if i > 0 {
+			b.WriteString(", ")
+		}
+		b.WriteString(rowTpl)
+	}
+
+	return b.String()
+}
+
+func buildRowPlaceholder(fieldCount int) string {
+	var b strings.Builder
+	b.Grow(fieldCount * 3)
+
+	b.WriteString("(")
+	for i := 0; i < fieldCount; i++ {
+		if i > 0 {
+			b.WriteString(", ")
+		}
+		b.WriteString("?")
+	}
+	b.WriteString(")")
+
+	return b.String()
+}
+
+func Insert[T any](pojo *T, qw *UpdateWrapper) int64 {
 	if qw == nil {
 		qw = BuilderUpdateWrapper(false)
 	}
@@ -472,21 +543,30 @@ func Insert[T any](pojo *T, qw *UpdateWrapper) int64 {
 		panic("No fields were found")
 	}
 
-	str1 := "("
-	str2 := "("
-	for i := 0; i < len(fields); i++ {
-		if i == len(fields)-1 {
-			str1 = fmt.Sprintf("%s %s", str1, fields[i])
-			str2 = fmt.Sprintf("%s ?", str2)
-		} else {
-			str1 = fmt.Sprintf("%s %s, ", str1, fields[i])
-			str2 = fmt.Sprintf("%s ?, ", str2)
-		}
-	}
-	str1 = fmt.Sprintf("%s ) ", str1)
-	str2 = fmt.Sprintf("%s ) ", str2)
+	// 使用 strings.Builder 优化字符串拼接
+	var sb strings.Builder
+	sb.WriteString("insert into ")
+	sb.WriteString(tableName)
+	sb.WriteString(" (")
 
-	baseSQL := fmt.Sprintf("insert into %s %s values %s", tableName, str1, str2)
+	for i, field := range fields {
+		if i > 0 {
+			sb.WriteString(", ")
+		}
+		sb.WriteString(field)
+	}
+	sb.WriteString(") values (")
+
+	for i := 0; i < len(fields); i++ {
+		if i > 0 {
+			sb.WriteString(", ")
+		}
+		sb.WriteString("?")
+	}
+	sb.WriteString(")")
+
+	baseSQL := sb.String()
+
 	LogInfo("Insert", fmt.Sprintf("Preparing: %s", baseSQL))
 	LogInfo("Insert", fmt.Sprintf("Parameters: %v", values))
 

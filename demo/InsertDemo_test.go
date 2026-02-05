@@ -1,9 +1,11 @@
 package demo
 
 import (
+	"fmt"
+	"testing"
+
 	"github.com/PurpleScorpion/go-sweet-orm/v3/logger"
 	"github.com/PurpleScorpion/go-sweet-orm/v3/mapper"
-	"testing"
 )
 
 func TestInsert1(t *testing.T) {
@@ -38,4 +40,20 @@ func TestInsert3(t *testing.T) {
 		mapper.BuilderUpdateWrapper(false).
 			SetExcludeEmpty(true))
 	logger.Info("添加成功: count: {} , user: {}", count, u)
+}
+
+// 排除空值
+func TestInsert4(t *testing.T) {
+	registerDemo()
+	var list []user
+
+	for i := 0; i < 10; i++ {
+		list = append(list, user{
+			UserName: fmt.Sprintf("demo%d", i),
+			Age:      18 + i,
+		})
+	}
+
+	mapper.InsertAll[user](list, mapper.BuilderUpdateWrapper(false).SetBulk(3))
+
 }
