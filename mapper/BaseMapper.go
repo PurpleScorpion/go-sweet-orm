@@ -97,7 +97,7 @@ func SelectList[T any](qw *QueryWrapper) []T {
 	return result
 }
 
-func SelectCount[T any](qw *QueryWrapper) int {
+func SelectCount[T any](qw *QueryWrapper) int64 {
 
 	if qw == nil {
 		qw = BuilderQueryWrapper()
@@ -124,7 +124,7 @@ func SelectCount[T any](qw *QueryWrapper) int {
 	if len(count) == 0 {
 		return 0
 	}
-	return count[0]
+	return int64(count[0])
 }
 
 func Delete[T any](qw *UpdateWrapper) int64 {
@@ -331,7 +331,7 @@ func Update[T any](qw *UpdateWrapper) int64 {
 
 // 批量插入 - 可极大提高效率
 // bulk, 单次插入数量
-func InsertAll[T any](list []*T, qw *UpdateWrapper) int64 {
+func InsertAll[T any](list []T, qw *UpdateWrapper) int64 {
 
 	if qw == nil {
 		qw = BuilderUpdateWrapper(false)
@@ -339,7 +339,8 @@ func InsertAll[T any](list []*T, qw *UpdateWrapper) int64 {
 
 	bulk := qw.bulk
 
-	if len(list) == 0 {
+	// 检查 list 是否为 nil 或空切片
+	if list == nil || len(list) == 0 {
 		return 0
 	}
 
@@ -513,7 +514,7 @@ func Insert[T any](pojo *T, qw *UpdateWrapper) int64 {
 	return result.RowsAffected
 }
 
-func SelectCount4SQL(sql string, values ...interface{}) int {
+func SelectCount4SQL(sql string, values ...interface{}) int64 {
 	count, err := gorm.G[int](globalDB).Raw(sql, values...).Find(context.Background())
 	if err != nil {
 		logger.Error("SelectCount4SQL failed: {}", err)
@@ -522,7 +523,7 @@ func SelectCount4SQL(sql string, values ...interface{}) int {
 	if len(count) == 0 {
 		return 0
 	}
-	return count[0]
+	return int64(count[0])
 }
 func SelectList4SQL[T any](sql string, values ...interface{}) []T {
 	result, err := gorm.G[T](globalDB).Raw(sql, values...).Find(context.Background())
