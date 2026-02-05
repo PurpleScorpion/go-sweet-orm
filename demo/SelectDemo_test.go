@@ -1,9 +1,10 @@
 package demo
 
 import (
+	"testing"
+
 	"github.com/PurpleScorpion/go-sweet-orm/v3/logger"
 	"github.com/PurpleScorpion/go-sweet-orm/v3/mapper"
-	"testing"
 )
 
 func TestSelectCount(t *testing.T) {
@@ -74,4 +75,34 @@ func TestSelectPage(t *testing.T) {
 		logger.Info("姓名: {} , 年龄: {}", u.UserName, u.Age)
 	}
 
+}
+
+type UserVO struct {
+	Name   string `json:"Name"`
+	AgeAAA int    `json:"AgeAAA"`
+}
+
+func TestSelectPageVO(t *testing.T) {
+	registerDemo()
+	//pageUtils := mapper.BuilderPageUtils(1, 2, mapper.BuilderQueryWrapper())
+	//page := mapper.Page[user](pageUtils)
+	page := mapper.Page[user](
+		mapper.BuilderPageUtils(1, 2,
+			mapper.BuilderQueryWrapper(),
+		),
+	)
+
+	var userVos []UserVO
+
+	list := page.List
+	for _, u := range list {
+		userVos = append(userVos, UserVO{
+			Name:   u.UserName,
+			AgeAAA: u.Age,
+		})
+	}
+
+	pageVO := mapper.ConvertPageData[user, UserVO](page, userVos)
+
+	logger.Info("转换结果: {}", pageVO)
 }

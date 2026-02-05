@@ -152,7 +152,9 @@
 	    for _, u := range list {
 		    logger.Info("姓名: {} , 年龄: {}", u.UserName, u.Age)
 	    }    
-   
+    ConvertPageData[泛型1, 泛型2](data PageData[泛型1], list []泛型2) PageData[泛型2]
+        其作用为有时需将查询结果进行转换,比如查询结果为PageData对象,而你希望将其转换成PageData[T]对象,那么就可以使用此函数
+        当然 , 你自己手动创建PageData对象 , 然后手动赋值给新的PageData对象也是可以的
    
    ```
 - 6 查询器函数介绍

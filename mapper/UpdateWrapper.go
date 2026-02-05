@@ -2,6 +2,7 @@ package mapper
 
 import (
 	"errors"
+
 	"github.com/PurpleScorpion/go-sweet-orm/v3/logger"
 	"gorm.io/gorm"
 )
@@ -18,6 +19,7 @@ type UpdateWrapper struct {
 	excludeField []string
 	autoId       bool
 	baseSql      string
+	bulk         int
 	values       []interface{}
 }
 
@@ -28,6 +30,7 @@ func BuilderUpdateWrapper(flag bool) *UpdateWrapper {
 		wrapper.txOrmer = globalDB.Begin()
 	}
 	wrapper.autoId = globalAutoId
+	wrapper.bulk = 2000
 	return wrapper
 }
 
@@ -50,6 +53,11 @@ func (qw *UpdateWrapper) SetTransaction(tx *gorm.DB) *UpdateWrapper {
 	}
 	qw.txFlag = true
 	qw.txOrmer = tx
+	return qw
+}
+
+func (qw *UpdateWrapper) SetBulk(bulk int) *UpdateWrapper {
+	qw.bulk = bulk
 	return qw
 }
 

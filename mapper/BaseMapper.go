@@ -3,10 +3,11 @@ package mapper
 import (
 	"context"
 	"fmt"
-	"github.com/PurpleScorpion/go-sweet-orm/v3/logger"
-	"gorm.io/gorm"
 	"reflect"
 	"strings"
+
+	"github.com/PurpleScorpion/go-sweet-orm/v3/logger"
+	"gorm.io/gorm"
 )
 
 type BaseMapper struct {
@@ -27,6 +28,11 @@ func Page[T any](page *PageUtils) PageData[T] {
 	page.setTotalSize(int64(count))
 
 	return buildPageData(page, list)
+}
+
+// ConvertPageData 将 PageData[T] 转换为 PageData[T2]
+func ConvertPageData[T any, T2 any](pageData PageData[T], list []T2) PageData[T2] {
+	return pagePo2Vo(pageData, list)
 }
 
 /**
@@ -331,7 +337,7 @@ func InsertAll[T any](list []*T, qw *UpdateWrapper) int64 {
 		qw = BuilderUpdateWrapper(false)
 	}
 
-	bulk := 2000
+	bulk := qw.bulk
 
 	if len(list) == 0 {
 		return 0

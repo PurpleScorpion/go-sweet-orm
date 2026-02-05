@@ -23,3 +23,13 @@ func builderPageData[T any](
 		List:       list,
 	}
 }
+
+func pagePo2Vo[T any, T2 any](pageData PageData[T], list []T2) PageData[T2] {
+	return PageData[T2]{
+		Current:    pageData.Current,
+		PageSize:   pageData.PageSize,
+		TotalCount: pageData.TotalCount,
+		TotalPage:  pageData.TotalPage,
+		List:       list,
+	}
+}
